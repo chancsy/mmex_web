@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% from '_reports.html' import tabs, delta, span_form %}
+{% block title %}Income vs expenses · Reports · MMEX Web UI{% endblock %}
+{% macro pct(v) %}{{ '%.0f%%' | format(v * 100) if v is not none else '—' }}{% endmacro %}
+{% block content %}
+<div class="heading"><h1>Income vs expenses</h1></div>
+{{ tabs(pages, 'reports.income') }}
+{{ span_form(span, years, 'reports.income') }}
+<div class="tablewrap"><table class="report">
+  <thead><tr><th>Month</th><th>Income</th><th>Expenses</th><th>Net</th><th>Saved</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+  <tr><th scope="row">{{ r.month }}</th><td class="num">{{ r.income | money(base) }}</td><td class="num">{{ r.expenses | money(base) }}</td>
+    <td class="num">{{ delta(r.net, base, hide=False) }}</td><td class="num">{{ pct(r.rate) }}</td></tr>
+  {% endfor %}
+  </tbody>
+  <tfoot>
+    <tr><th scope="row">Total</th><td class="num">{{ total.income | money(base) }}</td><td class="num">{{ total.expenses | money(base) }}</td>
+      <td class="num">{{ delta(total.net, base, hide=False) }}</td><td class="num">{{ pct(total.rate) }}</td></tr>
+    <tr><th scope="row">Average</th><td class="num">{{ average.income | money(base) }}</td><td class="num">{{ average.expenses | money(base) }}</td>
+      <td class="num">{{ delta(average.net, base, hide=False) }}</td><td></td></tr>
+  </tfoot>
+</table></div>
+<p class="small muted">Income is every deposit and expenses every withdrawal, in {{ base.symbol if base else 'the base currency' }} at the rate on its date; transfers never count, and ignored accounts are left out. Saved is net ÷ income.</p>
+{% endblock %}

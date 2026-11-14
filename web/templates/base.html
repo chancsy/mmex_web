@@ -35,6 +35,7 @@
       <a href="{{ url_for('pages.recent') }}" {% if request.endpoint == 'pages.recent' %}aria-current="page"{% endif %}>Recent</a>
       {% set waiting = queue_pending() %}<a href="{{ url_for('queue.index') }}" {% if request.endpoint and request.endpoint.startswith('queue.') %}aria-current="page"{% endif %}>Queue{% if waiting %}<span class="badge" title="{{ waiting }} waiting">{{ waiting }}</span>{% endif %}</a>
       <a href="{{ url_for('entry.history') }}" {% if request.endpoint in ('entry.history', 'entry.undo') %}aria-current="page"{% endif %}>History</a>
+      <a href="{{ url_for('reports.index') }}" {% if request.endpoint and request.endpoint.startswith('reports.') %}aria-current="page"{% endif %}>Reports</a>
       <a href="{{ url_for('rates.index') }}" {% if request.endpoint in ('rates.index', 'rates.day') %}aria-current="page"{% endif %}>Rates</a>
       <a href="{{ url_for('settings.settings') }}" {% if request.endpoint == 'settings.settings' %}aria-current="page"{% endif %}>Settings</a>
       <form method="post" action="{{ url_for('auth.logout') }}" class="inline">

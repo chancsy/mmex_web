@@ -350,3 +350,45 @@
     });
   });
 })();
+
+// Report tables: tap a group's name (an account type, a top category) to
+// show or hide its rows. Tables marked data-start-shut start collapsed;
+// without this script every row shows.
+(function () {
+  'use strict';
+  var tables = document.querySelectorAll('table[data-groups]');
+  if (!tables.length) return;
+  var all = document.querySelector('[data-expand-all]');
+  function set(tbody, open) {
+    tbody.classList.toggle('shut', !open);
+    var b = tbody.querySelector('.gtoggle');
+    if (b) b.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  function label() {
+    if (!all) return;
+    var shut = document.querySelector('table[data-groups] tbody.grp.shut');
+    all.textContent = shut ? 'Expand all' : 'Collapse all';
+  }
+  tables.forEach(function (t) {
+    var start = t.hasAttribute('data-start-shut');
+    t.querySelectorAll('tbody.grp').forEach(function (tb) {
+      if (start && tb.querySelector('tr.sub')) set(tb, false);
+    });
+    t.addEventListener('click', function (ev) {
+      var b = ev.target.closest('.gtoggle');
+      if (!b) return;
+      var tb = b.closest('tbody');
+      set(tb, tb.classList.contains('shut'));
+      label();
+    });
+  });
+  if (all) {
+    all.hidden = false;
+    all.addEventListener('click', function () {
+      var open = all.textContent === 'Expand all';
+      document.querySelectorAll('table[data-groups] tbody.grp').forEach(function (tb) { set(tb, open); });
+      label();
+    });
+    label();
+  }
+})();

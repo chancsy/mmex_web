@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% from '_reports.html' import tabs, delta %}
+{% block title %}Month-end balances · Reports · MMEX Web UI{% endblock %}
+{% macro acct_row(r) %}
+<tr class="sub">
+  <th scope="row"><a href="{{ url_for('pages.register', account_id=r.id) }}">{{ r.name }}</a>
+    {%- if r.status != 'Open' %} <span class="chip">{{ r.status }}</span>{% endif %}
+    {%- if not r.ignored and not r.liquid %} <span class="chip">not liquid</span>{% endif %}
+    {%- if r.investment %} <span class="chip">investment</span>{% endif %}
+    {%- if r.asset %} <span class="chip" title="Valued by the MMEX asset {{ r.asset.name }}: {{ r.asset.change | lower }} {{ r.asset.rate }}% a year since {{ r.asset.start }}">asset value</span>{% endif %}</th>
+  {% set cur = currencies.get(r.currency) %}
+  <td class="num">{{ r.now | secret(cur) }}</td>
+  <td class="num">{{ delta(r.change, cur) }}</td>
+  <td class="num">{{ r.base_now | secret(base) }}</td>
+</tr>
+{% endmacro %}
+{% block content %}
+<div class="heading"><h1>Month-end balances</h1></div>
+{{ tabs(pages, 'reports.month_end') }}
+<form method="get" class="card rspan">
+  <a href="{{ url_for('reports.month_end', month=prev) }}">‹ {{ prev }}</a>
+  <label>Month <input type="month" name="month" value="{{ month }}" max="{{ current }}"></label>
+  <button type="submit" class="mini">Show</button>
+  {% if next <= current %}<a href="{{ url_for('reports.month_end', month=next) }}">{{ next }} ›</a>{% endif %}
+</form>
+<section class="card totals rtotals">
+  {% for key, label in [('total', 'Total'), ('liquid', 'Liquid'), ('investment', 'Investment')] %}
+  {% set t = totals[key] %}
+  <div><span class="label">{{ label }}</span><span class="num big">{{ t.now | secret(base) }}</span><span class="num small">{{ delta(t.now - t.prev, base) }}</span></div>
+  {% endfor %}
+</section>
+<div class="tablewrap"><table class="report" data-groups>
+  <thead><tr><th>Account</th><th>Balance</th><th>Change</th><th>In {{ base.symbol if base else 'base' }}</th></tr></thead>
+  {% for g in groups %}
+  <tbody class="grp">
+    <tr class="gh"><th scope="rowgroup"><button type="button" class="link gtoggle" aria-expanded="true">{{ g.label }}</button></th>
+      <td></td><td class="num">{{ delta(g.change, base) }}</td><td class="num">{{ g.total | secret(base) }}</td></tr>
+    {% for r in g.rows %}{{ acct_row(r) }}{% endfor %}
+  </tbody>
+  {% endfor %}
+  {% if ignored %}
+  <tbody class="grp ignored">
+    <tr class="gh"><th scope="rowgroup"><button type="button" class="link gtoggle" aria-expanded="true">Ignored (not in totals)</button></th><td></td><td></td><td></td></tr>
+    {% for r in ignored %}{{ acct_row(r) }}{% endfor %}
+  </tbody>
+  {% endif %}
+</table></div>
+<p class="small muted">Balance and Change are in each account's own currency (Change is what moved since {{ prev }}'s end); group rows and "In {{ base.symbol if base else 'base' }}" are converted at {{ month }}'s month-end rate. Closed accounts appear only while they hold a balance.</p>
+{% endblock %}

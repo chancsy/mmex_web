@@ -87,7 +87,26 @@ PREF_DEFAULTS = {
     'twin_notes': '{payee}, {expense_account} -> {to_account}',
     'twin_to_account': None,
     'twin_expense_account': None,
+    # Reports (see engine/reports.py). nonliquid None = not chosen yet: Asset
+    # and Loan accounts count as not liquid until the Settings page is saved.
+    'report_ignored_accounts': [],     # a separate "wallet": left out of every report
+    'nonliquid_accounts': None,        # in Total, not in Liquid
+    'investment_accounts': [],         # in Investment (must be liquid)
+    'asset_valued_accounts': {},       # {account id (str): ASSETS_V1 id}: valued by that asset's rule
 }
+
+NONLIQUID_TYPES = ('Asset', 'Loan')
+
+
+def report_config(prefs, account_types) -> dict:
+    """The engine's report config from the prefs. account_types: {id: type},
+    for the not-yet-chosen Not liquid default."""
+    nonliquid = prefs['nonliquid_accounts']
+    if nonliquid is None:
+        nonliquid = [a for a, t in account_types.items() if t in NONLIQUID_TYPES]
+    return {'ignored': set(prefs['report_ignored_accounts']), 'nonliquid': set(nonliquid),
+            'investment': set(prefs['investment_accounts']),
+            'assets': {int(k): v for k, v in (prefs['asset_valued_accounts'] or {}).items()}}
 
 
 def transids(journal) -> list:
@@ -200,7 +219,8 @@ class Store:
         return out
 
     def prefs(self) -> dict:
-        out = {k: (list(v) if isinstance(v, list) else v) for k, v in PREF_DEFAULTS.items()}
+        out = {k: (list(v) if isinstance(v, list) else dict(v) if isinstance(v, dict) else v)
+               for k, v in PREF_DEFAULTS.items()}
         with self._connect() as conn:
             for key, value in conn.execute('SELECT key, value FROM prefs'):
                 if key in PREF_DEFAULTS:

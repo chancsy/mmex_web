@@ -378,3 +378,49 @@ details.card > summary { cursor: pointer; font-weight: 600; }
   .rv-balances table.balances th, .rv-balances table.balances td { padding: .3rem .4rem; font-size: .82rem; }
   .rv-balances table.balances td:first-child { white-space: normal; overflow-wrap: anywhere; }
 }
+
+/* reports */
+.rtabs { display: flex; flex-wrap: wrap; gap: .35rem; margin: 0 0 .8rem; }
+.rtabs a { font-size: .85rem; padding: .25rem .7rem; border-radius: 99px; background: var(--chip); color: var(--text); }
+.rtabs a[aria-current="page"] { background: var(--accent); color: var(--on-accent); }
+.rspan { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .9rem; }
+.rspan label { display: flex; align-items: center; gap: .4rem; }
+.rspan .years { display: flex; flex-wrap: wrap; gap: .2rem .55rem; color: var(--muted); }
+.rspan a[aria-current="page"], .rby a[aria-current="page"] { font-weight: 650; color: var(--text); }
+.rlist { list-style: none; padding: .3rem 1rem; }
+.rlist li { display: flex; flex-direction: column; padding: .5rem 0; }
+.rlist li + li { border-top: 1px solid var(--line); }
+.rtotals .num.small { text-align: left; }
+table.report { border-collapse: collapse; width: 100%; font-size: .88rem; }
+table.report th, table.report td { padding: .35rem .65rem; border-top: 1px solid var(--line); white-space: nowrap; }
+table.report thead th { border-top: 0; text-align: right; color: var(--muted); font-weight: 600; }
+table.report thead th:first-child, table.report tbody th, table.report tfoot th { text-align: left; }
+table.report tbody th { font-weight: 400; }
+table.report tr.gh th, table.report tr.gh td, table.report tfoot th, table.report tfoot td { font-weight: 650; }
+table.report tr.gh { background: var(--bg); }
+table.report tr.sub th { padding-left: 1.6rem; }
+table.report tfoot tr:first-child th, table.report tfoot tr:first-child td { border-top: 2px solid var(--line); }
+table.report .strong { font-weight: 650; }
+/* The first column stays put while a wide table scrolls sideways. */
+table.report th:first-child { position: sticky; left: 0; background: var(--card); z-index: 1; }
+table.report tr.gh th:first-child { background: var(--bg); }
+table.report .gname { padding-left: 1em; }
+table.report tbody.ignored th, table.report tbody.ignored td { color: var(--muted); }
+tbody.grp.shut tr.sub { display: none; }
+button.gtoggle { color: var(--text); font-weight: 650; text-align: left; }
+button.gtoggle::before { content: '▾'; display: inline-block; width: 1em; color: var(--muted); }
+button.gtoggle[aria-expanded="false"]::before { content: '▸'; }
+table.rsettings td { text-align: center; }
+table.rsettings td select { max-width: 14rem; font-size: .82rem; padding: .2rem .3rem; }
+.rby { margin: 0 0 .6rem; }
+@media (max-width: 640px) {
+  table.report { font-size: .8rem; }
+  table.report th, table.report td { padding: .3rem .45rem; }
+  table.report tr.sub th { padding-left: 1rem; }
+  /* Long names wrap instead of pushing the figures off screen. */
+  table.report tbody th { white-space: normal; min-width: 7rem; max-width: 9.5rem; }
+  table.report .chip { font-size: .62rem; }
+  table.rsettings thead th { white-space: normal; text-align: center; }
+  table.rsettings th, table.rsettings td { padding: .3rem .3rem; }
+  table.rsettings td select { max-width: 7.5rem; }
+}
