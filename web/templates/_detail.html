@@ -1,0 +1,13 @@
+{# One transaction's fields. Needs: t (views.transaction) #}
+<dl class="detail">
+  <dt>Date</dt><dd>{{ t.date }}</dd>
+  <dt>Type</dt><dd>{{ t.type }}</dd>
+  <dt>{{ 'From' if t.type == 'Transfer' else 'Account' }}</dt><dd>{{ t.account }}</dd>
+  {% if t.type == 'Transfer' %}<dt>To</dt><dd>{{ t.to_account }}</dd>{% else %}<dt>Payee</dt><dd>{{ t.payee or '—' }}</dd>{% endif %}
+  <dt>Amount</dt><dd class="num left">{{ '%.2f' | format(t.amount) }}{% if t.type == 'Transfer' and (t.to_amount - t.amount) | abs > 0.001 %} (received {{ '%.2f' | format(t.to_amount) }}){% endif %}</dd>
+  <dt>Category</dt><dd>{{ t.category or '—' }}</dd>
+  {% if t.notes %}<dt>Notes</dt><dd class="pre">{{ t.notes }}</dd>{% endif %}
+  {% if t.tags %}<dt>Tags</dt><dd>{% for g in t.tags %}<span class="tag">#{{ g }}</span> {% endfor %}</dd>{% endif %}
+  {% if t.status %}<dt>Status</dt><dd>{{ t.status }}</dd>{% endif %}
+  {% if t.number %}<dt>Number</dt><dd>{{ t.number }}</dd>{% endif %}
+</dl>

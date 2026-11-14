@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% block title %}Queue · MMEX Web UI{% endblock %}
+{% block content %}
+<div class="heading"><h1>Queue</h1></div>
+<nav class="tabs">
+  {% for t in tabs %}<a href="{{ url_for('queue.index', status=t, source=source) }}" {% if tab == t %}aria-current="page"{% endif %}>{{ t | capitalize }}</a>{% endfor %}
+</nav>
+{% if sources | length > 1 %}
+<nav class="tabs small">
+  <a href="{{ url_for('queue.index', status=tab) }}" {% if not source %}aria-current="page"{% endif %}>Every source</a>
+  {% for s in sources %}<a href="{{ url_for('queue.index', status=tab, source=s) }}" {% if source == s %}aria-current="page"{% endif %}>{{ s }}</a>{% endfor %}
+</nav>
+{% endif %}
+<p class="small muted">Batches other programs sent (e.g. a new bill, a reconciliation plan). Nothing reaches the database until you approve it; an approved batch shows in History and can be undone there.</p>
+<ul class="history">
+  {% for i in items %}
+  <li>
+    <div class="hrow">
+      <span class="date">{{ i.submitted_at_utc | localtime }}</span>
+      <span class="chip">{{ i.source }}</span>
+      {% if i.status != 'pending' %}<span class="chip">{{ i.status }}{% if i.decided_at_utc %} {{ i.decided_at_utc | localtime }}{% endif %}</span>{% endif %}
+      {% if i.edited %}<span class="chip">edited</span>{% endif %}
+      {% if i.undone_at_utc %}<span class="chip">undone</span>{% endif %}
+    </div>
+    <div class="summary"><a href="{{ url_for('queue.item', item_id=i.id) }}">{{ i.title }}</a></div>
+    {% if i.note %}<div class="small muted">Note: {{ i.note }}</div>{% endif %}
+  </li>
+  {% else %}
+  <li class="empty">{{ 'Nothing waiting.' if tab == 'pending' else 'Nothing here.' }}</li>
+  {% endfor %}
+</ul>
+{% endblock %}

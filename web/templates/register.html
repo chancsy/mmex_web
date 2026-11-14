@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% block title %}{{ account.name }} · MMEX Web UI{% endblock %}
+{% block content %}
+{% set here = request.full_path if request.query_string else request.path %}
+<div class="heading">
+  <h1>{{ account.name }}{% if account.status != 'Open' %} <span class="chip">{{ account.status }}</span>{% endif %}</h1>
+  {% if can_write() and account.status == 'Open' %}<a class="button" href="{{ url_for('entry.new', account=account.id, next=here) }}">+ New</a>{% endif %}
+</div>
+<section class="card totals">
+  <div><span class="label">Balance</span><span class="num big {{ 'neg' if reg.balance < 0 }}" data-total="balance">{{ reg.balance | secret(currency) }}</span></div>
+  <div><span class="label">Reconciled</span><span class="num {{ 'neg' if reg.reconciled < 0 }}" data-total="reconciled">{{ reg.reconciled | secret(currency) }}</span></div>
+  <div><span class="label">Unreconciled</span><span class="num" data-total="unreconciled">{{ (reg.balance - reg.reconciled) | secret(currency) }}</span></div>
+</section>
+
+<form class="card filters" method="get">
+  <label>Status
+    <select name="status">
+      {% for s in status_filters %}
+      <option value="{{ s }}" {% if filters.status == s %}selected{% endif %}>{{ {'all': 'All', 'unreconciled': 'Not reconciled', 'blank': 'Unflagged', 'R': 'Reconciled (R)', 'F': 'Follow up (F)', 'V': 'Void (V)'}[s] }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>From <input type="date" name="from" value="{{ filters.from }}"></label>
+  <label>To <input type="date" name="to" value="{{ filters.to }}"></label>
+  <label class="grow">Search <input type="search" name="q" value="{{ filters.q }}" placeholder="payee, category, notes"></label>
+  <button type="submit">Filter</button>
+  {% if filters.status != 'all' or filters.from or filters.to or filters.q %}<a class="small" href="{{ url_for('pages.register', account_id=account.id) }}">Clear</a>{% endif %}
+</form>
+
+<p class="small muted">{{ reg.total }} transaction{{ '' if reg.total == 1 else 's' }}{% if pages > 1 %} · page {{ page }} of {{ pages }}{% endif %} · newest first · running balance covers every row, whatever the filter</p>
+<ul class="txns">
+  {% for r in reg.rows %}
+  {% with cur=currency, show_balance=true, show_account=false %}{% include '_row.html' %}{% endwith %}
+  {% else %}
+  <li class="empty">Nothing matches.</li>
+  {% endfor %}
+</ul>
+{% if pages > 1 %}
+<nav class="pager">
+  {% set args = {'status': filters.status, 'from': filters.from, 'to': filters.to, 'q': filters.q} %}
+  {% if page > 1 %}<a href="{{ url_for('pages.register', account_id=account.id, page=page - 1, **args) }}">← Newer</a>{% endif %}
+  {% if page < pages %}<a href="{{ url_for('pages.register', account_id=account.id, page=page + 1, **args) }}">Older →</a>{% endif %}
+</nav>
+{% endif %}
+{% endblock %}

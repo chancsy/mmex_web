@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% block title %}Deleted transaction · MMEX Web UI{% endblock %}
+{% block content %}
+<section class="card narrow wide">
+  <h1>In MMEX's trash</h1>
+  {% include '_detail.html' %}
+  <p class="small muted">Deleted {{ t.deleted | localtime }}. If MMEX Web UI deleted it, undo that in <a href="{{ url_for('entry.history') }}">History</a>; otherwise restore it from the trash in desktop MMEX.</p>
+</section>
+{% endblock %}

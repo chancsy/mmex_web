@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block title %}Rates · MMEX Web UI{% endblock %}
+{% block content %}
+<div class="heading"><h1>Exchange rates</h1></div>
+<form class="card filters" method="get" action="{{ url_for('rates.index') }}">
+  <label>Month-end <input type="month" name="month" value="{{ default_month }}" required></label>
+  <button type="submit">Open</button>
+  <span class="small muted">Download that day's rates from xe.com, or edit them.</span>
+</form>
+<p class="small muted">Every month-end since the first rate is listed; <strong>Download</strong> fetches a month-end that's missing rates for a currency kept in MMEX (one with an open account, or chosen in Settings) and saves xe.com's whole table; <strong>Fill</strong> uses a table already saved, without visiting xe.com. {{ base or 'Base currency' }} per one unit of each currency, as MMEX's currency history keeps them, at full precision: downloaded ones as xe.com gives them, typed ones as typed (shown here to 6 decimals; hover for the stored figure). Rows not on a month-end came from elsewhere, e.g. MMEX's own update.</p>
+{% if fillable and can_write() %}
+<form method="post" action="{{ url_for('rates.fill') }}" class="card filters">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <button type="submit" class="secondary">Fill {{ fillable }} month-end(s) from saved tables</button>
+  <span class="small muted">These already have xe.com's whole table saved, so filling them visits nothing. It adds only rates MMEX doesn't have yet.</span>
+</form>
+{% endif %}
+{% if rows %}
+<div class="tablewrap">
+<table class="rates">
+  <thead><tr><th>Date</th><th></th>{% for c in currencies %}<th class="num" title="{{ c.name }}">{{ c.label }}</th>{% endfor %}</tr></thead>
+  <tbody>
+  {% for r in rows %}
+  <tr id="d{{ r.date }}"{% if not r.eom %} class="not-eom"{% endif %}>
+    <td><a href="{{ url_for('rates.day', date=r.date) }}">{{ r.date }}</a>{% if not r.eom %} <span class="chip">not month-end</span>{% endif %}</td>
+    <td>{% if r.missing and can_write() %}<form method="post" action="{{ url_for('rates.day', date=r.date) }}" class="inline rate-download">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="back" value="list">
+      <button type="submit" name="action" value="download" class="mini"{% if r.saved %} title="From the saved xe.com table: no visit to xe.com"{% endif %}>{{ 'Fill' if r.saved else 'Download' }}</button></form>{% elif r.missing %}<span class="chip">missing</span>{% endif %}</td>
+    {% for c in currencies %}{% set v = r['values'].get(c.id) %}<td class="num" data-cid="{{ c.id }}">{% if v %}<span title="{{ v.type }}: {{ v.value }}">{{ '%.6f' | format(v.value) }}</span>{% endif %}</td>{% endfor %}
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="card">No rates yet. Pick a month-end above to download them.</p>
+{% endif %}
+{% endblock %}

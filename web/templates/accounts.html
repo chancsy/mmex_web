@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% block title %}Accounts · MMEX Web UI{% endblock %}
+{% macro account_row(a) %}
+{% set own = currencies.get(a.currency) %}
+{% set convert = in_base and a.currency != base.id %}
+{% set cur = base if convert else own %}
+{% set bal = a.base_balance if convert else a.balance %}
+{% set rec = a.base_reconciled if convert else a.reconciled %}
+<li{% if a.status != 'Open' %} class="closed"{% endif %}>
+  <a href="{{ url_for('pages.register', account_id=a.id) }}"{% if convert %} class="converted"{% endif %}>
+    <span class="name">{% if a.favorite %}<span class="star" title="Favourite">★</span> {% endif %}{{ a.name }}{% if a.status != 'Open' %} <span class="chip">{{ a.status }}</span>{% endif %}</span>
+    <span class="num {{ 'neg' if bal < -0.005 }}">{{ bal | secret(cur) }}</span>
+    {% if convert %}<span class="num own {{ 'neg' if a.balance < -0.005 }}" title="In {{ own.symbol }}">{{ a.balance | secret(own) }}</span>{% endif %}
+    <span class="sub">Reconciled <span class="{{ 'neg' if rec < -0.005 }}">{{ rec | secret(cur) }}</span>{% if (bal - rec) | abs > 0.005 %} · Unreconciled {{ (bal - rec) | secret(cur) }}{% endif %}</span>
+  </a>
+</li>
+{% endmacro %}
+{% block content %}
+<div class="heading">
+  <h1>Accounts</h1>
+  <span class="tools small">
+    <button type="button" class="link" id="toggle-all" hidden>Collapse all</button>
+    <a href="{{ url_for('pages.accounts', closed=None if include_closed else '1', base='1' if in_base else None) }}">{{ 'Hide closed' if include_closed else 'Show closed' }}</a>
+    {% if base %}<a href="{{ url_for('pages.accounts', closed='1' if include_closed else None, base=None if in_base else '1') }}">{{ 'Show own currencies' if in_base else 'Show all in ' ~ base.symbol }}</a>{% endif %}
+  </span>
+</div>
+
+<section class="card totals">
+  <div><span class="label">Total of accounts</span><span class="num big {{ 'neg' if grand.balance < -0.005 }}">{{ grand.balance | secret(base) }}</span></div>
+  <div><span class="label">Reconciled</span><span class="num {{ 'neg' if grand.reconciled < -0.005 }}">{{ grand.reconciled | secret(base) }}</span></div>
+</section>
+
+{% for g in groups %}
+<details class="card group" data-group="{{ g.type }}" open>
+  <summary>
+    <span class="arrow" aria-hidden="true"></span>
+    <span class="glabel">{{ g.label }}</span>
+    <span class="num gtotal {{ 'neg' if g.balance < -0.005 }}">{{ g.balance | secret(base) }}</span>
+  </summary>
+  {% if g.shown %}<ul class="accounts">{% for a in g.shown %}{{ account_row(a) }}{% endfor %}</ul>{% endif %}
+  {% if g.others %}
+  <details class="others">
+    <summary>
+      <span class="arrow" aria-hidden="true"></span>
+      <span class="glabel">Others ({{ g.others | length }})</span>
+      <span class="num small {{ 'neg' if g.others_balance < -0.005 }}">{{ g.others_balance | secret(base) }}</span>
+    </summary>
+    <ul class="accounts">{% for a in g.others %}{{ account_row(a) }}{% endfor %}</ul>
+  </details>
+  {% endif %}
+</details>
+{% else %}
+<p>No accounts.</p>
+{% endfor %}
+<p class="small muted">Totals{% if in_base %} and balances{% endif %} are in {{ base.symbol if base else 'the base currency' }}, at the latest rates in MMEX's currency history{% if in_base %} (each converted balance shows its own-currency amount under it){% endif %}, and count open accounts only. Share and asset accounts show their cash balance only, without stock or asset values. Hide accounts or put favourites first in <a href="{{ url_for('settings.settings') }}">Settings</a>.</p>
+{% endblock %}

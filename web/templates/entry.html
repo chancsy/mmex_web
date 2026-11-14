@@ -1,0 +1,151 @@
+{% extends 'base.html' %}
+{% block title %}{{ 'New transaction' if mode == 'add' else 'Edit transaction' }} · MMEX Web UI{% endblock %}
+{% block content %}
+{% set cur_of = script_data.currency %}
+{% set is_transfer = v.type == 'Transfer' %}
+{% set is_twin = v.type == 'Twin' %}
+{% set cross = is_transfer and v.account_id and v.to_account_id and cur_of.get(v.account_id) != cur_of.get(v.to_account_id) %}
+{% set new_payee = v.payee and v.payee.lower() not in script_data.payees %}
+<div class="heading">
+  <h1>{{ 'New transaction' if mode == 'add' else 'Edit transaction' }}</h1>
+  {% if mode == 'edit' %}<a class="small danger" href="{{ url_for('entry.delete', trans_id=trans.id, next=next or None) }}">Delete…</a>{% endif %}
+</div>
+
+{% if error %}<div class="banner error" role="alert">{{ error }}</div>{% endif %}
+{% if notice %}<div class="banner info" role="status">{{ notice }}</div>{% endif %}
+{% if duplicates %}
+<div class="banner warn" role="alert">
+  <p class="tight"><strong>Possible duplicate.</strong> The same amount is already in {{ 'these accounts' if is_twin else 'this account' }} within 3 days:</p>
+  <ul class="dups">
+    {% for r in duplicates %}
+    <li>{% if r.where %}{{ r.where }}: {% endif %}{{ r.date }} · {{ r.other or '—' }} · {{ r.category }}{% if r.notes %} · “{{ r.notes }}”{% endif %} · {{ '%.2f' | format(r.amount) }}{% if r.status %} [{{ r.status }}]{% endif %}</li>
+    {% endfor %}
+  </ul>
+  <p class="tight">If this one is new, press <strong>Save anyway</strong>.</p>
+</div>
+{% endif %}
+
+<form method="post" class="card entry" autocomplete="off" novalidate
+      action="{{ url_for('entry.new') if mode == 'add' else url_for('entry.edit', trans_id=trans.id) }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="next" value="{{ next }}">
+  {% if mode == 'edit' %}<input type="hidden" name="orig" value="{{ trans.orig }}">{% endif %}
+  {% if duplicates %}<input type="hidden" name="confirm_duplicate" value="1">{% endif %}
+
+  <fieldset class="types" role="radiogroup" aria-label="Type">
+    {% for t in types %}
+    <label class="seg"><input type="radio" name="type" value="{{ t }}" {% if v.type == t %}checked{% endif %}><span>{{ t }}</span></label>
+    {% endfor %}
+  </fieldset>
+  {% if mode == 'edit' %}<p class="small muted tight">id {{ trans.id }}{% if trans.type != v.type %} · changing from {{ trans.type }} to {{ v.type }}{% endif %}</p>{% endif %}
+
+  <div class="row2">
+    <label>Amount
+      <input class="amount" name="amount" inputmode="decimal" value="{{ v.amount }}" placeholder="0.00" {% if mode == 'add' %}autofocus{% endif %} required>
+    </label>
+    <label>Date
+      <input type="date" name="date" value="{{ v.date }}" required>
+      <span class="quick"><button type="button" class="link" data-days="0">Today</button> · <button type="button" class="link" data-days="-1">Yesterday</button></span>
+    </label>
+  </div>
+
+  <div class="banner info only-twin" {% if not is_twin %}hidden{% endif %}>
+    <p class="tight">A twin saves two rows: a transfer from <em>Paid from</em> to <em>To account</em>, and a withdrawal in <em>Expense account</em> with the payee and category below. Same date and amount; one Undo removes both.</p>
+    <p class="tight small twin-preview" aria-live="polite"></p>
+  </div>
+
+  <label><span class="account-label">{{ 'From account' if is_transfer else 'Paid from' if is_twin else 'Account' }}</span>
+    <select name="account" required>
+      <option value="">Pick an account</option>
+      {% for group, accts in account_groups.items() %}
+      <optgroup label="{{ group }}">
+        {% for a in accts %}<option value="{{ a.id }}" {% if v.account_id == a.id | string %}selected{% endif %}>{{ a.name }}</option>{% endfor %}
+      </optgroup>
+      {% endfor %}
+    </select>
+  </label>
+
+  <label class="only-transfer" {% if not (is_transfer or is_twin) %}hidden{% endif %}>To account
+    <select name="to_account">
+      <option value="">Pick an account</option>
+      {% for group, accts in account_groups.items() %}
+      <optgroup label="{{ group }}">
+        {% for a in accts %}<option value="{{ a.id }}" {% if v.to_account_id == a.id | string %}selected{% endif %}>{{ a.name }}</option>{% endfor %}
+      </optgroup>
+      {% endfor %}
+    </select>
+  </label>
+  <label class="only-twin" {% if not is_twin %}hidden{% endif %}>Notes for the transfer <span class="muted">(filled in from the payee and accounts; change it if you like)</span>
+    <input name="transfer_notes" value="{{ v.transfer_notes }}" placeholder="Filled in when you save">
+  </label>
+  <h3 class="twin-part only-twin" {% if not is_twin %}hidden{% endif %}>Expense</h3>
+  <label class="only-twin" {% if not is_twin %}hidden{% endif %}>Expense account (the spending is booked here)
+    <select name="expense_account">
+      <option value="">Pick an account</option>
+      {% for group, accts in account_groups.items() %}
+      <optgroup label="{{ group }}">
+        {% for a in accts %}<option value="{{ a.id }}" {% if v.expense_account_id == a.id | string %}selected{% endif %}>{{ a.name }}</option>{% endfor %}
+      </optgroup>
+      {% endfor %}
+    </select>
+  </label>
+  <label class="only-cross" {% if not cross %}hidden{% endif %}>Amount received by the To account (it uses a different currency)
+    <input name="to_amount" inputmode="decimal" value="{{ v.to_amount }}" placeholder="0.00">
+  </label>
+
+  <div class="payee-line only-payee" {% if is_transfer %}hidden{% endif %}>
+    <label class="grow">Payee
+      <input name="payee" list="payee-list" value="{{ v.payee }}" placeholder="Start typing" autocapitalize="words">
+    </label>
+    <label class="check only-new-payee" {% if is_transfer or not new_payee %}hidden{% endif %}>
+      <input type="checkbox" name="create_payee" value="1" {% if v.create_payee %}checked{% endif %}> Create new payee
+    </label>
+  </div>
+
+  <label>Category
+    <input name="category" list="category-list" value="{{ v.category }}" placeholder="{{ 'Transfer' if is_transfer else 'Start typing' }}">
+  </label>
+
+  <label><span class="notes-label">{{ 'Notes for the expense row' if is_twin else 'Notes' }}</span>
+    <textarea name="notes" rows="2">{{ v.notes }}</textarea>
+  </label>
+
+  <fieldset class="tagpick">
+    <legend>Tags</legend>
+    {% if tags | length > 12 %}<input type="search" class="tagfilter" placeholder="Filter tags" aria-label="Filter tags">{% endif %}
+    <div class="chips">
+      {% set chosen = v.tags | map('lower') | list %}
+      {% for t in tags %}
+      <label class="chipbox"><input type="checkbox" name="tags" value="{{ t }}" {% if t.lower() in chosen %}checked{% endif %}><span>#{{ t }}</span></label>
+      {% else %}
+      <span class="small muted">No tags yet.</span>
+      {% endfor %}
+    </div>
+    <label class="small">New tags (separate with spaces)
+      <input name="new_tags" value="{{ v.new_tags }}" placeholder="e.g. 2026Trip" autocapitalize="off">
+    </label>
+  </fieldset>
+
+  <div class="row2">
+    <label>Status
+      <select name="status">
+        {% for value, label in statuses %}<option value="{{ value }}" {% if v.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        {% if v.status and v.status not in statuses | map('first') | list %}<option value="{{ v.status }}" selected>{{ v.status }}</option>{% endif %}
+      </select>
+    </label>
+    <label><span>Number <span class="muted">(optional)</span></span>
+      <input name="number" value="{{ v.number }}">
+    </label>
+  </div>
+
+  <div class="actions">
+    <button type="submit">{{ 'Save anyway' if duplicates else 'Save' }}</button>
+    {% if mode == 'add' %}<button type="submit" name="save_new" value="1" class="secondary">{{ 'Save anyway & add another' if duplicates else 'Save & add another' }}</button>{% endif %}
+    <a class="small" href="{{ next_url(next) }}">Cancel</a>
+  </div>
+</form>
+
+<datalist id="payee-list">{% for p in payees %}<option value="{{ p.name }}">{% endfor %}</datalist>
+<datalist id="category-list">{% for c in categories %}<option value="{{ c }}">{% endfor %}</datalist>
+<script type="application/json" id="entry-data">{{ script_data | tojson }}</script>
+{% endblock %}

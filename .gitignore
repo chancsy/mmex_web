@@ -1,0 +1,13 @@
+# Personal setup notes and one-off tools: not part of the published app
+PLAN.md
+SESSION_HANDOFF.md
+local/
+.temp/
+
+__pycache__/
+*.pyc
+.venv*/
+
+# Local deployment copies of the examples
+.env
+docker-compose.yml

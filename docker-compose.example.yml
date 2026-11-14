@@ -1,0 +1,42 @@
+# Example compose file. Copy it next to a .env made from .env.example:
+#   cp docker-compose.example.yml docker-compose.yml && cp .env.example .env
+#   docker compose build
+#   docker compose run --rm mmex_web python -m web setup     # set the login password (first run)
+#   docker compose up -d
+#
+# Put it behind an HTTPS reverse proxy (or a VPN). The session cookie is
+# HTTPS-only unless MMEX_WEB_COOKIE_SECURE=0.
+
+services:
+  mmex_web:
+    build: .
+    container_name: mmex_web
+    # Match the owner of the MMEX folder, so the app can read and write the DB.
+    user: "${PUID:-1000}:${PGID:-1000}"
+    environment:
+      - TZ=${TZ:-UTC}
+      - MMEX_DB_PATH=/mmex/${MMEX_DB_FILE:-money.mmb}
+      - APP_DATA_DIR=/data
+      - MMEX_WEB_TRUSTED_PROXIES=${MMEX_WEB_TRUSTED_PROXIES:-1}
+      - MMEX_WEB_COOKIE_SECURE=${MMEX_WEB_COOKIE_SECURE:-1}
+      - MMEX_WEB_URL_PREFIX=${MMEX_WEB_URL_PREFIX:-}
+      - MMEX_WEB_SESSION_DAYS=${MMEX_WEB_SESSION_DAYS:-30}
+      - MMEX_BACKUP_DIR=/backups
+      - MMEX_BACKUP_KEEP=${MMEX_BACKUP_KEEP:-20}
+      - MMEX_BACKUP_MIN_INTERVAL_MIN=${MMEX_BACKUP_MIN_INTERVAL_MIN:-30}
+    volumes:
+      # Mount the folder that holds the DB, never the file alone: SQLite
+      # writes its -journal next to the DB, and sync tools replace the file
+      # by renaming a new copy over it.
+      # :ro keeps the app read-only (it says so on every page). Remove :ro
+      # to let it add and edit transactions; stop every other MMEX that
+      # writes this file first, or sync tools will see conflicts.
+      - ${MMEX_DIR:?set MMEX_DIR in .env}:/mmex:ro
+      # The app's own data: secrets.json (login) and app.db (history, for undo).
+      - ${APP_DATA_DIR:?set APP_DATA_DIR in .env}:/data
+      # Backups taken before writes: the newest MMEX_BACKUP_KEEP are kept.
+      - ${BACKUP_DIR:?set BACKUP_DIR in .env}:/backups
+    ports:
+      # Localhost only: let the reverse proxy reach it, nothing else.
+      - "127.0.0.1:${PORT:-8000}:8000"
+    restart: unless-stopped

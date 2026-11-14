@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block title %}History · MMEX Web UI{% endblock %}
+{% block content %}
+<div class="heading"><h1>History</h1></div>
+{% if sources | length > 1 %}
+<nav class="tabs">
+  <a href="{{ url_for('entry.history') }}" {% if not source %}aria-current="page"{% endif %}>All</a>
+  {% for s in sources %}<a href="{{ url_for('entry.history', source=s) }}" {% if source == s %}aria-current="page"{% endif %}>{{ s }}</a>{% endfor %}
+</nav>
+{% endif %}
+<p class="small muted">Every change MMEX Web UI made to the database, newest first. Undo puts the rows back as they were; undoing an undo (Redo) puts the change back. Either refuses if the rows have been changed since.</p>
+<ul class="history">
+  {% for w in writes %}
+  <li class="{{ 'undone' if w.undone_at_utc }}">
+    <div class="hrow">
+      <span class="date">{{ w.at_utc | localtime }}</span>
+      <span class="chip">{{ w.action }}</span>
+      {% if w.source != 'you' %}<span class="chip">{{ w.source }}</span>{% endif %}
+      {% if w.undone_at_utc %}<span class="chip">{{ 'redone' if w.action == 'undo' else 'undone' }} {{ w.undone_at_utc | localtime }}</span>
+      {% elif w.journal and can_write() %}<a class="small" href="{{ url_for('entry.undo', write_id=w.id) }}">{{ 'Redo' if w.action == 'undo' else 'Undo' }}…</a>{% endif %}
+    </div>
+    <div class="summary">{{ w.summary }}</div>
+    <details class="small"><summary>Details</summary>
+      <pre>{{ w.lines | join('\n') }}</pre>
+      {% if w.backup %}<p class="muted">Backup: {{ w.backup.rsplit('/', 1)[-1] }}</p>{% endif %}
+    </details>
+  </li>
+  {% else %}
+  <li class="empty">Nothing yet.</li>
+  {% endfor %}
+</ul>
+{% if pages > 1 %}
+<nav class="pager">
+  {% if page > 1 %}<a href="{{ url_for('entry.history', source=source, page=page - 1) }}">← Newer</a>{% endif %}
+  {% if page < pages %}<a href="{{ url_for('entry.history', source=source, page=page + 1) }}">Older →</a>{% endif %}
+</nav>
+{% endif %}
+{% endblock %}

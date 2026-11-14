@@ -1,0 +1,19 @@
+{# One transaction row. Needs: r (a views row), cur (currency), show_balance, show_account; optional here (the current page, for edit's "next") and account (the register's, for its totals) #}
+<li class="txn{% if r.void %} void{% endif %}">
+  <span class="date">{{ r.date }}</span>
+  <span class="what">
+    {% if can_write() and not r.deleted %}<a class="other" href="{{ url_for('entry.edit', trans_id=r.id, next=here or None) }}">{{ r.other or '—' }}</a>
+    {% else %}<span class="other">{{ r.other or '—' }}</span>{% endif %}
+    <span class="meta">
+      {% if show_account %}<a href="{{ url_for('pages.register', account_id=r.account_id) }}">{{ r.account }}</a> · {% endif %}{{ r.category }}{% if r.number %} · #{{ r.number }}{% endif %}{% if r.source is defined %} · <span class="src">{{ 'app' if r.source == 'you' else (r.source or 'other') }}</span>{% endif %}
+    </span>
+    {% if r.notes %}<span class="notes">{{ r.notes }}</span>{% endif %}
+    {% if r.tags %}<span class="tags">{% for t in r.tags %}<span class="tag">#{{ t }}</span>{% endfor %}</span>{% endif %}
+  </span>
+  <span class="status">{% if can_write() and not r.deleted and (r.status or '') in ('', 'R', 'F') %}{% set fb = flag_button(r.status or '') %}<form method="post" action="{{ url_for('entry.flag', trans_id=r.id) }}" class="inline flagform">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="status" value="{{ fb.status }}"><input type="hidden" name="next" value="{{ here or '' }}">{% if account is defined %}<input type="hidden" name="account" value="{{ account.id }}">{% endif %}
+    <button type="submit" class="flag {{ fb.cls }}" title="{{ fb.title }}" aria-label="Status: {{ fb.title }}">{{ fb.label }}</button></form>
+  {%- elif r.status %}<span class="flag flag-{{ r.status }}" title="{{ {'R': 'Reconciled', 'F': 'Follow up', 'V': 'Void', 'D': 'Duplicate'}.get(r.status, r.status) }}">{{ r.status }}</span>{% endif %}</span>
+  <span class="amt num {{ 'neg' if r.amount < 0 else 'pos' }}">{{ r.amount | money(cur) }}</span>
+  {% if show_balance %}<span class="bal num {{ 'neg' if r.balance < 0 }}">{{ r.balance | secret(cur) }}</span>{% endif %}
+</li>

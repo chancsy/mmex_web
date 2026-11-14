@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% block title %}Delete transaction · MMEX Web UI{% endblock %}
+{% block content %}
+<section class="card narrow wide">
+  <h1>Delete this transaction?</h1>
+  {% include '_detail.html' %}
+  <p class="small muted">It goes to MMEX's trash (a soft delete), so desktop MMEX can still restore it, and History here can undo it.</p>
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="orig" value="{{ orig }}">
+    <input type="hidden" name="next" value="{{ next }}">
+    <div class="actions">
+      <button type="submit" class="danger">Delete</button>
+      <a class="small" href="{{ url_for('entry.edit', trans_id=t.id, next=next or None) }}">Cancel</a>
+    </div>
+  </form>
+</section>
+{% endblock %}

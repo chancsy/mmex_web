@@ -1,0 +1,168 @@
+{% extends 'base.html' %}
+{% block title %}{{ item.title }} · Queue · MMEX Web UI{% endblock %}
+{% macro balances(rows, with_change=False) %}
+{% if rows %}
+<div class="tablewrap"><table class="balances">
+  <thead><tr><th>Account</th><th class="num">Before</th><th class="num">After</th>{% if with_change %}<th class="num">Change</th>{% endif %}</tr></thead>
+  <tbody>{% for b in rows %}<tr><td>{{ b.account }}</td><td class="num">{{ b.before | money if b.before is not none else '—' }}</td><td class="num">{{ b.after | money }}</td>
+    {%- if with_change %}<td class="num {{ 'neg' if b.change is not none and b.change < 0 else 'pos' if b.change }}">{% if b.change is not none %}{{ '+' if b.change > 0 }}{{ b.change | money }}{% else %}—{% endif %}</td>{% endif %}</tr>{% endfor %}</tbody>
+</table></div>
+{% endif %}
+{% endmacro %}
+{% macro badges(list) %}{% for cls, label in list %}<span class="rvbadge rv-{{ cls }}">{{ label }}</span>{% endfor %}{% endmacro %}
+{% macro why(text) %}{% if text %}<span class="rv-why">Why: {{ text }}</span>{% endif %}{% endmacro %}
+{% macro value(v) %}{% if v is none or v == '' %}<em>empty</em>{% elif v is number %}{{ '%.2f' | format(v) }}{% elif v is sequence and v is not string %}{{ v | join(', ') or '—' }}{% else %}{{ v }}{% endif %}{% endmacro %}
+
+{% macro timeline(review) %}
+{% set c = review.counts %}
+<div class="rv-filters" role="group" aria-label="Show">
+  <button type="button" class="rvchip" data-filter="all" aria-pressed="true">All</button>
+  {% for key, label in [('twin', 'Twins'), ('transfer', 'Transfers'), ('own', 'Own'), ('change', 'Changes')] %}
+  {% if c[key] %}<button type="button" class="rvchip" data-filter="{{ key }}" aria-pressed="false">{{ label }} {{ c[key] }}</button>{% endif %}
+  {% endfor %}
+</div>
+<ol class="txns rv-list">
+{% for e in review.entries %}
+  {% if e.kind == 'checks' %}
+  <li class="rv-check {{ 'ok' if e.ok else 'bad' }}" data-filter="checks">
+    {% for as_of, group in e['items'] | groupby('as_of') %}
+    <div class="rv-checkline"><span class="rv-mark" aria-hidden="true">{{ '✓' if group | selectattr('ok', 'false') | list | length == 0 else '✗' }}</span>
+      <strong>{{ as_of }}</strong>
+      {% for x in group %}<span class="rv-checkitem{{ ' bad' if x.ok == false }}">{% if x.kind == 'absent' %}no {{ x.type or 'row' }}{% if x.payee %} {{ x.payee }}{% endif %} in {{ x.account }} {{ x['from'] }}..{{ x.to }}{% else %}{{ x.account }} {{ x.mmex | money }}{% if not x.ok %} (statement {{ x.statement | money }}, diff {{ '%+.2f' | format(x.mmex - x.statement) }}){% endif %}{% endif %}</span>{% endfor %}
+    </div>
+    {% endfor %}
+  </li>
+  {% elif e.kind == 'twin' %}
+  {% set t, x = e.transfer, e.expense %}
+  <li class="txn rv rv-add" data-filter="twin">
+    <span class="date">{{ t.date }}</span>
+    <span class="what">
+      <span class="other">{{ x.payee }}</span>
+      <span class="meta">{{ t.account }} → {{ t.to_account }} · {{ x.account }} · {{ x.category }}</span>
+      {% if x.notes %}<span class="notes">{{ x.notes }}</span>{% endif %}
+      <span class="notes">Transfer notes: {{ t.notes }}</span>
+      {{ why(e.why) }}
+    </span>
+    <span class="rv-badges"><span class="rvbadge rv-twin">Twin</span>{{ badges(e.badges) }}{% if t.status %}<span class="flag flag-{{ t.status }}">{{ t.status }}</span>{% endif %}</span>
+    <span class="amt num neg">{{ e.amount | money }}</span>
+  </li>
+  {% elif e.kind in ('row', 'change', 'delete') %}
+  {% set r = e.row %}
+  <li class="txn rv rv-{{ 'add' if e.kind == 'row' else e.kind }}" data-filter="{{ e.filter }}">
+    <span class="date">{{ (e.after or r).date }}</span>
+    <span class="what">
+      <span class="other">{{ e.title }}</span>
+      <span class="meta">{{ e.route }} · {{ r.type if r.type == 'Transfer' else r.category }}{% if e.kind != 'row' %} · #{{ r.id }}{% endif %}</span>
+      {% if r.notes and e.kind != 'change' and r.notes != e.title %}<span class="notes">{{ r.notes }}</span>{% endif %}
+      {% if e.kind == 'change' %}
+      <span class="rv-diff">{% for f in e.fields %}<span class="rv-field">{{ f.name }}: <del>{{ value(f.before) }}</del> → <ins>{{ value(f.after) }}</ins></span>{% endfor %}</span>
+      {% if r.notes and r.notes != e.title and 'notes' not in e.fields | map(attribute='name') %}<span class="notes">{{ r.notes }}</span>{% endif %}
+      {% endif %}
+      {% if r.tags %}<span class="tags">{% for tg in r.tags %}<span class="tag">#{{ tg }}</span>{% endfor %}</span>{% endif %}
+      {{ why(e.why) }}
+    </span>
+    <span class="rv-badges">{% if r.type == 'Transfer' %}<span class="rvbadge rv-transfer">Transfer</span>{% endif %}{{ badges(e.badges) }}{% if (e.after or r).status %}<span class="flag flag-{{ (e.after or r).status }}">{{ (e.after or r).status }}</span>{% endif %}</span>
+    <span class="amt num {{ 'neg' if e.amount < 0 else 'pos' }}">{{ e.amount | money }}</span>
+  </li>
+  {% elif e.kind == 'flag' %}
+  {% set f = e.event %}
+  <li class="txn rv rv-change" data-filter="change">
+    <span class="date">{{ f['from'] }}</span>
+    <span class="what"><span class="other"><span class="rv-op">Flag</span> {{ f.ids | length }} row(s) → {{ f.status }}</span>
+      <span class="meta">{{ f.account }} · {{ f['from'] }} to {{ f.to }}</span>{{ why(e.why) }}</span>
+    <span class="rv-badges"><span class="flag flag-{{ f.status }}">{{ f.status }}</span></span>
+    <span class="amt num"></span>
+  </li>
+  {% endif %}
+{% endfor %}
+</ol>
+{% endmacro %}
+
+{% macro overview(review) %}
+{% set c = review.counts %}
+{% if review.summary %}<p class="rv-summary">{{ review.summary }}</p>{% endif %}
+<p class="rv-counts">
+  <span>{{ c.new }} new row{{ '' if c.new == 1 else 's' }}{% if c.twin %} ({{ c.twin }} twin{{ '' if c.twin == 1 else 's' }}){% endif %}</span>
+  {% if c.change %}<span>{{ c.change }} change{{ '' if c.change == 1 else 's' }}</span>{% endif %}
+  {% if c.checks %}<span class="{{ 'pos' if c.checks_ok == c.checks else 'neg' }}">{{ '✓' if c.checks_ok == c.checks else '✗' }} {{ c.checks_ok }}/{{ c.checks }} checks pass</span>{% endif %}
+  {% if c.new_payees %}<span class="rvbadge rv-new">{{ c.new_payees }} new payee{{ '' if c.new_payees == 1 else 's' }}</span>{% endif %}
+  {% if c.new_tags %}<span class="rvbadge rv-new">{{ c.new_tags }} new tag{{ '' if c.new_tags == 1 else 's' }}</span>{% endif %}
+</p>
+<div class="rv-balances">{{ balances(review.balances, with_change=True) }}</div>
+{% endmacro %}
+
+{% block content %}
+<div class="heading">
+  <h1>{{ item.title }}</h1>
+  <a class="small" href="{{ url_for('queue.index') }}">Queue</a>
+</div>
+<p class="hrow"><span class="chip">{{ item.source }}</span> <span class="chip">{{ item.status }}</span>{% if item.edited %} <span class="chip">edited</span>{% endif %}
+  <span class="small muted">sent {{ item.submitted_at_utc | localtime }}{% if item.decided_at_utc %} · {{ item.status }} {{ item.decided_at_utc | localtime }}{% endif %} · key {{ item.key }}</span></p>
+
+{% if item.status == 'pending' %}
+  {% if changed %}
+  <div class="banner warn" role="status">What this batch does has changed since it was sent (other entries since then move the balances; a row it expects may have changed). Below is what it does now; what it did when sent is under "As sent".</div>
+  {% endif %}
+  {% if not now.ok or not now.checks_ok %}
+  <div class="banner error" role="alert">It can't be applied as it is now: {{ now.error or 'a check fails' }}. Reject it{% if edit %}, or edit it{% endif %}.</div>
+  {% endif %}
+  <section class="card">
+    <h2>Approving does this</h2>
+    {{ overview(review) }}
+    {% for w in now.warnings %}<p class="small muted">Warning: {{ w }}</p>{% endfor %}
+  </section>
+  {% if review.has_events %}{{ timeline(review) }}{% endif %}
+  <section class="card rv-after">
+    <details class="small"{% if not review.has_events %} open{% endif %}><summary>Plain text</summary><pre>{{ now.lines | join('\n') }}</pre></details>
+    {% if changed %}<details class="small"><summary>As sent</summary><pre>{{ item.preview.lines | join('\n') }}</pre>{{ balances(item.preview.balances) }}</details>{% endif %}
+  </section>
+
+  {% if can_write() and edit %}
+  <details class="card">
+    <summary>Edit before approving</summary>
+    <form method="post" action="{{ url_for('queue.edit', item_id=item.id) }}" class="entry">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label>Amount <input name="amount" inputmode="decimal" value="{{ '%.2f' | format(edit.amount) if edit.amount is number else edit.amount }}" required></label>
+      <label>Date <input type="date" name="date" value="{{ edit.date }}" required></label>
+      <label>Notes <input name="notes" value="{{ edit.notes or '' }}"></label>
+      <div class="actions"><button type="submit" class="secondary">Save changes</button></div>
+    </form>
+  </details>
+  {% endif %}
+
+  {% if can_write() %}
+  <section class="card">
+    <form method="post" action="{{ url_for('queue.reject', item_id=item.id) }}" class="entry">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label>Note for the sender (optional) <input name="note" maxlength="500"></label>
+      <div class="actions"><button type="submit" class="secondary">Reject</button></div>
+    </form>
+  </section>
+  {% endif %}
+
+  {% if can_write() and now.ok and now.checks_ok %}
+  {% set c = review.counts %}
+  <form method="post" action="{{ url_for('queue.approve', item_id=item.id) }}" class="approve-bar">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="seen" value="{{ seen }}">
+    <input type="hidden" name="changed" value="{{ '1' if changed else '0' }}">
+    {% if changed %}<label class="check"><input type="checkbox" name="ack" value="1"> I've looked at what changed</label>{% endif %}
+    <span class="small muted">{{ c.new }} new · {{ c.change }} change{{ '' if c.change == 1 else 's' }}{% if c.checks %} · {{ c.checks_ok }}/{{ c.checks }} checks ✓{% endif %}</span>
+    <button type="submit">Approve</button>
+  </form>
+  {% endif %}
+{% else %}
+  <section class="card">
+    {% if item.note %}<p>Note: {{ item.note }}</p>{% endif %}
+    {% if item.status == 'approved' %}
+    <p>Added {{ item.rows | length }} row(s){% if item.undone_at_utc %}, since undone{% endif %}. <a href="{{ url_for('entry.history', source=item.source) }}">History</a></p>
+    {% endif %}
+    <h2>As sent</h2>
+    {{ overview(review) }}
+  </section>
+  {% if review.has_events %}{{ timeline(review) }}{% endif %}
+  <section class="card rv-after">
+    <details class="small"{% if not review.has_events %} open{% endif %}><summary>Plain text</summary><pre>{{ item.preview.lines | join('\n') }}</pre></details>
+  </section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block title %}Recent · MMEX Web UI{% endblock %}
+{% block content %}
+<div class="heading"><h1>Recent</h1></div>
+<nav class="tabs">
+  {% for key, label in [('added', 'Added'), ('edited', 'Edited'), ('deleted', 'Deleted')] %}
+  <a href="{{ url_for('pages.recent', by=key) }}" {% if by == key %}aria-current="page"{% endif %}>{{ label }}</a>
+  {% endfor %}
+</nav>
+<p class="small muted">Each row says who wrote it: <em>app</em> (MMEX Web UI) or <em>other</em> (desktop or Android MMEX, or anything before MMEX Web UI).
+
+  {% if by == 'added' %}Newest first, by when the row was created (MMEX IDs are creation times; very old rows have small IDs).
+  {% elif by == 'edited' %}Newest first, by last update time.
+  {% else %}Rows in MMEX's trash, newest deletion first.{% endif %}
+</p>
+{% set here = request.full_path if request.query_string else request.path %}
+<ul class="txns">
+  {% for r in rows %}
+  {% with cur=r.currency, show_balance=false, show_account=true %}{% include '_row.html' %}{% endwith %}
+  {% if by != 'added' %}<li class="stamp small muted">{{ 'deleted' if by == 'deleted' else 'updated' }} {{ (r.deleted if by == 'deleted' else r.updated) | localtime }}</li>{% endif %}
+  {% else %}
+  <li class="empty">Nothing yet.</li>
+  {% endfor %}
+</ul>
+{% endblock %}

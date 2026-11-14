@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block title %}Rates {{ date }} · MMEX Web UI{% endblock %}
+{% block content %}
+<div class="heading">
+  <h1>Rates for {{ date }}</h1>
+  <a class="small" href="{{ url_for('rates.index') }}">All rates</a>
+</div>
+{% if not eom %}<div class="banner warn">{{ date }} isn't the last day of its month.</div>{% endif %}
+{% if saved %}<p class="small muted">xe.com's table for this date is saved ({{ saved.rates | length }} currencies, fetched {{ saved.fetched_at_utc | localtime }}), so filling from it visits nothing. <strong>Refresh</strong> fetches it again.</p>{% endif %}
+<p class="small muted">{{ base or 'Base currency' }} per one unit. A typed value is saved as typed, as Manual; a downloaded one is saved as Online, at xe.com's full precision (as the ledger sheet keeps it). Clear a box to delete that rate.</p>
+<form method="post" class="card entry">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  {% for c in currencies %}
+  {% set v = stored.get(c.id) %}
+  <label>{{ c.label }} <span class="muted">{{ c.name }}{% if v %} · {{ v.type }}{% endif %}{% if not c.active %} · not kept in MMEX, not filled{% elif not c.account %} · kept (Settings){% endif %}</span>
+    <input name="rate_{{ c.id }}" inputmode="decimal" value="{{ v.value | string if v else '' }}" placeholder="—" {% if not can_write() %}disabled{% endif %}>
+  </label>
+  {% endfor %}
+  {% if can_write() %}
+  <div class="actions">
+    <button type="submit" name="action" value="save">Save</button>
+    {% if can_download and saved %}<button type="submit" name="action" value="download" class="secondary">Fill from saved table</button>
+    <button type="submit" name="action" value="refresh" class="secondary">Refresh from xe.com</button>
+    {% elif can_download %}<button type="submit" name="action" value="download" class="secondary">Download from xe.com</button>
+    {% else %}<span class="small muted">This day isn't over yet, so there's nothing to download.</span>{% endif %}
+  </div>
+  {% endif %}
+</form>
+{% endblock %}
