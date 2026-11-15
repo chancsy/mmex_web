@@ -134,6 +134,12 @@ class EngineTests(unittest.TestCase):
         self.assertAlmostEqual(feb['d_total'], (BANK_JAN + 70) * 1.2 - (BANK_JAN + 100) * 1.1)
         # Rate moved 1.1 -> 1.2 on what was held at January's end.
         self.assertAlmostEqual(feb['fx'], (BANK_JAN + 100) * 0.1)
+        # Investment's change leaves out the 100 moved from Bank (investment) to Cash:
+        # what's left is January's interest less spending, then February's rate move.
+        self.assertAlmostEqual(jan['moved_investment'], -100 * 1.1)
+        self.assertAlmostEqual(jan['d_investment'], (3.21 - 20.5) * 1.1)
+        self.assertEqual(feb['moved_investment'], 0)
+        self.assertAlmostEqual(feb['d_investment'], BANK_JAN * 0.1)
         # Ignored accounts leave every figure; investment needs liquid.
         snap = R.snapshot(self.conn, ['2026-01', '2026-02'], {'ignored': {BANK}, 'investment': {CASH}, 'nonliquid': {CASH}})
         row = R.net_worth(snap)[0]
@@ -213,6 +219,7 @@ class ReportPageTests(QueueTestsBase):
         nw = self.client.get('/reports/net-worth?end=2026-02&n=3').text
         self.assertIn('>2026-02</a>', nw)
         self.assertIn('From rates', nw)
+        self.assertNotIn('>Transfers</th>', nw, 'no investment accounts chosen')
         inc = self.client.get('/reports/income?end=2026-02&n=3').text
         self.assertIn('>2026-01</th>', inc)
         self.assertIn('Average', inc)
@@ -243,6 +250,10 @@ class ReportPageTests(QueueTestsBase):
         page = self.client.get('/reports/month-end?month=2026-02').text
         self.assertIn('Ignored (not in totals)', page)
         self.assertIn('>not liquid</span>', page)
+        self.assertNotIn('transfers)', page, 'nothing moved into Investment in February')
+        jan = self.client.get('/reports/month-end?month=2026-01').text
+        self.assertIn('transfers)', jan)           # Bank (investment) sent 100 to Cash (EUR)
+        self.assertIn('>Transfers</th>', self.client.get('/reports/net-worth?end=2026-02&n=3').text)
 
     def test_asset_accounts(self):
         setup_assets(self.db)

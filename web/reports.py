@@ -117,6 +117,10 @@ def month_end():
             if on:
                 totals[key]['now'] += a['base'][month]
                 totals[key]['prev'] += a['base'][prev]
+    for key, t in totals.items():
+        t['change'] = t['now'] - t['prev']
+    totals['investment']['moved'] = snap['investment_transfers'][month]
+    totals['investment']['change'] -= totals['investment']['moved']
     for g in groups.values():
         g['rows'].sort(key=lambda r: r['name'].lower())
     ignored.sort(key=lambda r: r['name'].lower())

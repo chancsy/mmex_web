@@ -29,6 +29,10 @@ Rules:
   do rows linked to an asset (buying or selling it moves money into or out
   of the asset; it isn't spending). A split row counts under its split
   categories.
+- Investment's change leaves out transfers between an investment account
+  and any other account (money moved in or out isn't a gain or loss); it's
+  what rates and real rows (income, fees, revaluations) did. The moved
+  amount is reported apart, at the investment account's month-end rate.
 - Config (all sets of account ids):
     ignored     left out of everything (a separate "wallet")
     nonliquid   in Total, not in Liquid
@@ -275,7 +279,8 @@ def snapshot(conn, month_list, config) -> dict:
     """Every account at each month-end: {'accounts': {id: account dict plus
     'own': {month: value}, 'base': {month: value}, 'rate': {month: rate},
     'cash': {month: balance}, 'ignored', 'liquid', 'investment', 'assets'}},
-    'months', 'base' (currency id), 'unlinked' (assets in no account)}.
+    'months', 'base' (currency id), 'unlinked' (assets in no account),
+    'investment_transfers' ({month: net amount moved into Investment})}.
     'own' is the balance plus the value of the assets the account holds."""
     accts = accounts(conn)
     rates = Rates(conn)
@@ -298,13 +303,36 @@ def snapshot(conn, month_list, config) -> dict:
         a.update(own=own, base=base, rate=rate, cash=bal[aid], ignored=aid in ignored, liquid=aid not in nonliquid,
                  investment=aid in investment and aid not in nonliquid, assets=mine)
     linked = {x['id'] for xs in held.values() for x in xs}
+    members = {aid for aid, a in accts.items() if a['investment'] and not a['ignored']}
     return {'accounts': accts, 'months': list(month_list), 'base': rates.base,
-            'unlinked': [x for x in found.values() if x['id'] not in linked]}
+            'unlinked': [x for x in found.values() if x['id'] not in linked],
+            'investment_transfers': _moved(conn, month_list, members, accts)}
+
+
+def _moved(conn, month_list, members, accts) -> dict:
+    """{month: base amount transferred into `members` from other accounts,
+    less what went out}, each side at its account's month-end rate (as in
+    the snapshot's 'rate')."""
+    out = {ym: 0.0 for ym in month_list}
+    if not members:
+        return out
+    for src, dst, amount, to_amount, ym in conn.execute(
+            f"SELECT ACCOUNTID, TOACCOUNTID, TRANSAMOUNT, TOTRANSAMOUNT, substr(TRANSDATE, 1, 7) FROM {TRANS} "
+            f"WHERE TRANSCODE = 'Transfer' AND {LIVE} AND substr(TRANSDATE, 1, 7) BETWEEN ? AND ?",
+            (month_list[0], month_list[-1])):
+        if ym not in out or (src in members) == (dst in members):
+            continue
+        if dst in members:
+            out[ym] += (to_amount or 0) * accts[dst]['rate'][ym]
+        else:
+            out[ym] -= (amount or 0) * accts[src]['rate'][ym]
+    return out
 
 
 def net_worth(snap) -> list:
     """One dict per month after the first in the snapshot: total, liquid,
-    investment, their changes (d_total, ...), and fx (how much of d_total
+    investment, their changes (d_total, ...; d_investment without transfers
+    in or out, which are in moved_investment), and fx (how much of d_total
     came only from rate moves on foreign balances held over the month).
     The snapshot's first month is only the baseline for the changes."""
     ms = snap['months']
@@ -319,6 +347,8 @@ def net_worth(snap) -> list:
         row = dict(month=ym, **sums[ym])
         for k in ('total', 'liquid', 'investment'):
             row['d_' + k] = sums[ym][k] - sums[prev][k]
+        row['moved_investment'] = snap['investment_transfers'][ym]
+        row['d_investment'] -= row['moved_investment']
         row['fx'] = sum(a['own'][prev] * (a['rate'][ym] - a['rate'][prev]) for a in counted
                         if a['currency'] != snap['base'])
         out.append(row)

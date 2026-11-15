@@ -138,7 +138,8 @@ automation (e.g. a bill fetcher) ──POST /api/queue──► queue ──you 
       linked to it, the buys, sells and revaluations, grown between them.
     - **Net worth:** Total, Liquid and Investment each month with their
       changes, and how much of Total's change came only from exchange
-      rates.
+      rates. Investment's change leaves out transfers into or out of
+      investment accounts (shown apart as Transfers).
     - **Income vs expenses:** each month's income (deposits), expenses
       (withdrawals), net and savings rate. Transfers and rows linked to an
       asset never count; split rows count under their split categories.

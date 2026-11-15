@@ -26,7 +26,7 @@
 <section class="card totals rtotals">
   {% for key, label in [('total', 'Total'), ('liquid', 'Liquid'), ('investment', 'Investment')] %}
   {% set t = totals[key] %}
-  <div><span class="label">{{ label }}</span><span class="num big">{{ t.now | secret(base) }}</span><span class="num small">{{ delta(t.now - t.prev, base) }}</span></div>
+  <div><span class="label">{{ label }}</span><span class="num big">{{ t.now | secret(base) }}</span><span class="num small">{{ delta(t.change, base) }}{% if key == 'investment' and (t.moved | abs) > 0.005 %} <span class="muted">({{ delta(t.moved, base) }} transfers)</span>{% endif %}</span></div>
   {% endfor %}
 </section>
 <div class="tablewrap"><table class="report" data-groups>
