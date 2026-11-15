@@ -59,7 +59,7 @@ def settings():
 
 def _report_settings(d, prefs) -> dict:
     """The Reports section: every account by type (closed ones apart), the
-    current choices, and MMEX's assets to value an account by."""
+    current choices."""
     accts = report_engine.accounts(d.conn)
     cfg = report_config(prefs, {a['id']: a['type'] for a in accts.values()})
     groups = {}
@@ -70,14 +70,13 @@ def _report_settings(d, prefs) -> dict:
     rows = [{'closed': closed, 'label': TYPE_LABELS.get(t, t),
              'accounts': sorted(accts_, key=lambda a: a['name'].lower())}
             for (closed, t), accts_ in sorted(groups.items(), key=lambda kv: key(kv[0]))]
-    return {'groups': rows, 'cfg': cfg, 'assets': list(report_engine.assets(d.conn).values()),
-            'defaulted': prefs['nonliquid_accounts'] is None}
+    return {'groups': rows, 'cfg': cfg, 'defaulted': prefs['nonliquid_accounts'] is None}
 
 
 @bp.route('/settings/reports', methods=['POST'])
 @login_required
 def report_settings():
-    """Ignored, not liquid, investment and asset-valued accounts. Investment
+    """Ignored, not liquid and investment accounts. Investment
     is part of Liquid, so an account can't be both investment and not
     liquid; such a save is refused whole."""
     d = db()
@@ -90,14 +89,8 @@ def report_settings():
         names = ', '.join(sorted(d.ref.accounts[a]['name'] for a in both))
         flash(f'Not saved: investment accounts must be liquid ({names} is ticked as both).', 'error')
         return redirect(url_for('settings.settings', _anchor='reports'))
-    known_assets = set(report_engine.assets(d.conn))
-    valued = {}
-    for a in known:
-        v = request.form.get(f'asset_{a}', '')
-        if v.isdigit() and int(v) in known_assets:
-            valued[str(a)] = int(v)
     current_app.config['MMEX_STORE'].set_prefs(report_ignored_accounts=ignored, nonliquid_accounts=nonliquid,
-                                               investment_accounts=investment, asset_valued_accounts=valued)
+                                               investment_accounts=investment)
     flash('Report settings saved.', 'info')
     return redirect(url_for('settings.settings', _anchor='reports'))
 

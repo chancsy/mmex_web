@@ -7,21 +7,32 @@ report config; the web pages lay the results out.
 Rules:
 - A month-end balance is core.balance()'s: INITIALBAL plus every row that
   isn't Void or deleted, transfers in included, up to the month's last day.
-- An account linked to an MMEX asset (ASSETS_V1) is worth its balance times
-  that asset's change since its start date, by MMEX's own formula:
-  exp(+-rate / 36500 * days) for Appreciates / Depreciates, 1 for None.
+- An Asset account is worth its balance plus the value of the MMEX assets
+  (ASSETS_V1) it holds, as MMEX shows it: an asset belongs to the Asset
+  account named like the asset (else like its type, e.g. "Automobile").
+  Other assets have no account and aren't counted.
+- An asset's value on a date is MMEX's (AssetModel::get_data_value_date):
+  0 before its start date. With no transactions linked to it (TRANSLINK_V1,
+  LINKTYPE 'Asset'), VALUE grown from the start date; otherwise, in date
+  order, each linked row adds what it paid in (Buy: a withdrawal or a
+  transfer out of its account) or takes out what it received (Sell: a
+  deposit), a self-transfer (Revalue) sets the value to its TOTRANSAMOUNT,
+  and the value grows between rows and after the last. Growth is
+  exp(+-rate / 36500 * days) for Appreciates / Depreciates, none for None.
+  Void rows are skipped (MMEX marks counting them as a FIXME).
 - Converting to the base currency: a month-end balance at that day's rate,
   an income or expense row at the rate on its own date. The rate on a date
   is MMEX's: with currency history on, the latest CURRENCYHISTORY_V1 rate
   on or before it (else the earliest after); otherwise, or with no
   history, CURRENCYFORMATS_V1.BASECONVRATE. The base currency is 1.
-- Income is Deposits and expenses Withdrawals; transfers never count. A
-  split row counts under its split categories.
+- Income is Deposits and expenses Withdrawals; transfers never count, nor
+  do rows linked to an asset (buying or selling it moves money into or out
+  of the asset; it isn't spending). A split row counts under its split
+  categories.
 - Config (all sets of account ids):
     ignored     left out of everything (a separate "wallet")
     nonliquid   in Total, not in Liquid
     investment  in Investment (a subset of Liquid)
-    assets      {account id: ASSETS_V1 id} for asset-valued accounts
 """
 
 import bisect
@@ -92,6 +103,10 @@ class Rates:
                 self.fixed[cid] = rate if rate else 1
         except sqlite3.OperationalError:
             pass
+        try:
+            self.account_currency = dict(conn.execute('SELECT ACCOUNTID, CURRENCYID FROM ACCOUNTLIST_V1'))
+        except sqlite3.OperationalError:
+            self.account_currency = {}
         self.history = {}
         if (_info(conn, 'USECURRENCYHISTORY') or '').upper() == 'TRUE':
             try:
@@ -125,33 +140,101 @@ def accounts(conn) -> dict:
                                   'FROM ACCOUNTLIST_V1')}
 
 
-def assets(conn) -> dict:
-    """{id: {id, name, start, change, rate}} from MMEX's Assets list."""
+def _asset_links(conn) -> dict:
+    """{asset id: [(date, transid, account id, code, amount, to account,
+    to amount)]} for every live row linked to an asset, oldest first."""
+    out = {}
     try:
-        rows = conn.execute('SELECT ASSETID, ASSETNAME, STARTDATE, VALUECHANGE, VALUECHANGERATE FROM ASSETS_V1 '
-                            'ORDER BY ASSETNAME').fetchall()
+        rows = conn.execute(
+            f"SELECT l.LINKRECORDID, substr(t.TRANSDATE, 1, 10), t.TRANSID, t.ACCOUNTID, t.TRANSCODE, "
+            f"t.TRANSAMOUNT, t.TOACCOUNTID, t.TOTRANSAMOUNT FROM TRANSLINK_V1 l "
+            f"JOIN {TRANS} t ON t.TRANSID = l.CHECKINGACCOUNTID "
+            f"WHERE l.LINKTYPE = 'Asset' AND {LIVE.replace('STATUS', 't.STATUS').replace('DELETEDTIME', 't.DELETEDTIME')} "
+            f"ORDER BY 2, 3").fetchall()
     except sqlite3.OperationalError:
         return {}
-    return {r[0]: {'id': r[0], 'name': r[1], 'start': (r[2] or '')[:10], 'change': r[3] or 'None',
-                   'rate': float(r[4] or 0)} for r in rows}
+    for aid, *row in rows:
+        out.setdefault(aid, []).append(tuple(row))
+    return out
 
 
-def asset_factor(asset, date) -> float:
-    """How much an asset's value has changed from its start date to `date`,
-    as MMEX computes it (AssetModel::get_data_value_date): continuous daily
-    compounding of the yearly percentage. 1 before the start date."""
+def asset_linked_rows(conn) -> set:
+    """TRANSIDs linked to an asset (any status)."""
     try:
-        days = (datetime.date.fromisoformat(date) - datetime.date.fromisoformat(asset['start'])).days
-    except ValueError:
-        return 1.0
-    if days <= 0:
-        return 1.0
+        return {r[0] for r in conn.execute("SELECT CHECKINGACCOUNTID FROM TRANSLINK_V1 WHERE LINKTYPE = 'Asset'")}
+    except sqlite3.OperationalError:
+        return set()
+
+
+def assets(conn) -> dict:
+    """{id: {id, name, type, value, start, change, rate, currency (None =
+    base), links}} from MMEX's Assets list; links as _asset_links()."""
+    try:
+        rows = conn.execute('SELECT ASSETID, ASSETNAME, ASSETTYPE, VALUE, STARTDATE, VALUECHANGE, VALUECHANGERATE, '
+                            'CURRENCYID FROM ASSETS_V1 ORDER BY ASSETNAME').fetchall()
+    except sqlite3.OperationalError:
+        return {}
+    links = _asset_links(conn)
+    return {r[0]: {'id': r[0], 'name': r[1], 'type': r[2] or '', 'value': float(r[3] or 0),
+                   'start': (r[4] or '')[:10], 'change': r[5] or 'None', 'rate': float(r[6] or 0),
+                   'currency': r[7] if r[7] is not None and r[7] > 0 else None, 'links': links.get(r[0], [])}
+            for r in rows}
+
+
+def _days(a, b) -> int:
+    return (datetime.date.fromisoformat(b) - datetime.date.fromisoformat(a)).days
+
+
+def _grow(asset, value, a, b) -> float:
+    """value carried from date a to date b at the asset's rate."""
     daily = asset['rate'] / 36500.0
     if asset['change'] == 'Appreciates':
-        return math.exp(daily * days)
+        return value * math.exp(daily * _days(a, b))
     if asset['change'] == 'Depreciates':
-        return math.exp(-daily * days)
-    return 1.0
+        return value * math.exp(-daily * _days(a, b))
+    return value
+
+
+def asset_value(asset, date, rates=None) -> float:
+    """The asset's value at the end of `date`, MMEX's way (see the module
+    notes). Unlinked: in the asset's currency (converted to the base when
+    `rates` is given); linked: in the base currency, as MMEX sums it."""
+    try:
+        if not asset['start'] or date < asset['start']:
+            return 0.0
+        if not asset['links']:
+            value = _grow(asset, asset['value'], asset['start'], date)
+            return value * rates.on(asset['currency'], date) if rates and asset['currency'] else value
+        value, last = 0.0, None
+        for day, _tid, acct, code, amount, to_acct, to_amount in asset['links']:
+            if day > date:
+                break
+            if last is not None and last < day:
+                value = _grow(asset, value, last, day)
+            last = day
+            if code == 'Transfer' and acct == to_acct:      # Revalue
+                value = to_amount or 0.0
+                continue
+            paid = -(amount or 0) if code == 'Deposit' else (amount or 0)   # Buy +, Sell -
+            value += paid * (rates.on(rates.account_currency.get(acct), day) if rates else 1.0)
+        return _grow(asset, value, last, date) if last is not None else 0.0
+    except ValueError:
+        return 0.0
+
+
+def account_assets(accts, found) -> dict:
+    """{account id: [asset, ...]}: each asset in the Asset account named
+    like it, else like its type (MMEX's link; one account per asset)."""
+    by_name = {}
+    for aid, a in accts.items():
+        if a['type'] == 'Asset':
+            by_name.setdefault(a['name'], aid)
+    out = {}
+    for asset in found.values():
+        aid = by_name.get(asset['name'], by_name.get(asset['type']))
+        if aid is not None:
+            out.setdefault(aid, []).append(asset)
+    return out
 
 
 # -- balances ------------------------------------------------------------------
@@ -191,28 +274,32 @@ def balances(conn, month_list, accts=None) -> dict:
 def snapshot(conn, month_list, config) -> dict:
     """Every account at each month-end: {'accounts': {id: account dict plus
     'own': {month: value}, 'base': {month: value}, 'rate': {month: rate},
-    'ignored', 'liquid', 'investment', 'asset'}}, 'months', 'base'
-    (currency id)}. 'own' is the asset-valued figure where one applies."""
+    'cash': {month: balance}, 'ignored', 'liquid', 'investment', 'assets'}},
+    'months', 'base' (currency id), 'unlinked' (assets in no account)}.
+    'own' is the balance plus the value of the assets the account holds."""
     accts = accounts(conn)
     rates = Rates(conn)
-    found_assets = assets(conn)
+    found = assets(conn)
+    held = account_assets(accts, found)
     bal = balances(conn, month_list, accts)
     ignored = set(config.get('ignored') or ())
     nonliquid = set(config.get('nonliquid') or ())
     investment = set(config.get('investment') or ())
-    asset_map = {int(k): v for k, v in (config.get('assets') or {}).items()}
     for aid, a in accts.items():
-        asset = found_assets.get(asset_map.get(aid))
+        mine = held.get(aid, [])
         own, base, rate = {}, {}, {}
         for ym in month_list:
             day = month_end(ym)
-            value = bal[aid][ym] * (asset_factor(asset, day) if asset else 1.0)
             rate[ym] = rates.on(a['currency'], day)
+            in_base = sum(asset_value(x, day, rates) for x in mine)
+            value = bal[aid][ym] + (in_base / rate[ym] if rate[ym] else 0.0)
             own[ym] = round(value, 2)
             base[ym] = value * rate[ym]
-        a.update(own=own, base=base, rate=rate, ignored=aid in ignored, liquid=aid not in nonliquid,
-                 investment=aid in investment and aid not in nonliquid, asset=asset)
-    return {'accounts': accts, 'months': list(month_list), 'base': rates.base}
+        a.update(own=own, base=base, rate=rate, cash=bal[aid], ignored=aid in ignored, liquid=aid not in nonliquid,
+                 investment=aid in investment and aid not in nonliquid, assets=mine)
+    linked = {x['id'] for xs in held.values() for x in xs}
+    return {'accounts': accts, 'months': list(month_list), 'base': rates.base,
+            'unlinked': [x for x in found.values() if x['id'] not in linked]}
 
 
 def net_worth(snap) -> list:
@@ -244,9 +331,11 @@ def flows(conn, ref, date_from, date_to, ignored=()) -> list:
     """Income and expense amounts between two dates (inclusive), in the
     base currency: [{month, category (id), path, kind ('income' or
     'expense'), amount (signed: income +, expense -)}], one per row or split
-    line. Transfers and ignored accounts are left out."""
+    line. Transfers, rows linked to an asset and ignored accounts are left
+    out."""
     rates = Rates(conn)
     ignored = set(ignored)
+    skip = asset_linked_rows(conn)
     currency = {r[0]: r[1] for r in conn.execute('SELECT ACCOUNTID, CURRENCYID FROM ACCOUNTLIST_V1')}
     splits = {}
     try:
@@ -259,7 +348,7 @@ def flows(conn, ref, date_from, date_to, ignored=()) -> list:
             f"SELECT TRANSID, ACCOUNTID, TRANSCODE, TRANSAMOUNT, CATEGID, substr(TRANSDATE, 1, 10) FROM {TRANS} "
             f"WHERE TRANSCODE IN ('Deposit', 'Withdrawal') AND {LIVE} AND substr(TRANSDATE, 1, 10) BETWEEN ? AND ?",
             (date_from, date_to)):
-        if acct in ignored:
+        if acct in ignored or tid in skip:
             continue
         rate = rates.on(currency.get(acct), day)
         sign = 1 if code == 'Deposit' else -1

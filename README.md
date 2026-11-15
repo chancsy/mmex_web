@@ -132,12 +132,16 @@ automation (e.g. a bill fetcher) ──POST /api/queue──► queue ──you 
     each month-end's rate, income and expenses at the rate on their date):
     - **Month-end balances:** every account at a chosen month-end, in its
       own currency and converted, with its change from the month before.
+      An asset account includes the MMEX assets it holds (the asset named
+      like the account, or like its type), valued as MMEX does: its value
+      grown at its rate from its start date, or, once transactions are
+      linked to it, the buys, sells and revaluations, grown between them.
     - **Net worth:** Total, Liquid and Investment each month with their
       changes, and how much of Total's change came only from exchange
       rates.
     - **Income vs expenses:** each month's income (deposits), expenses
-      (withdrawals), net and savings rate. Transfers never count; split
-      rows count under their split categories.
+      (withdrawals), net and savings rate. Transfers and rows linked to an
+      asset never count; split rows count under their split categories.
     - **By category:** categories × months with total and average;
       top-level categories expand to their subcategories.
     - **Account changes:** how each account type changed by month or by
@@ -148,9 +152,7 @@ automation (e.g. a bill fetcher) ──POST /api/queue──► queue ──you 
     Twin notes pattern, and extra currencies to keep rates for. For the
     reports, per account: **Ignore** (a separate "wallet", left out of
     every report), **Not liquid** (in Total, not Liquid; asset and loan
-    accounts until first saved), **Investment** (part of Liquid), and
-    **Value by asset** (the balance follows an MMEX asset's appreciation or
-    depreciation rate since its start date, with MMEX's own formula). Kept
+    accounts until first saved) and **Investment** (part of Liquid). Kept
     in `app.db`, so they're the same on every device.
   - **Light or dark:** a button in the top bar, remembered per device (a
     cookie); until it's used, the page follows the system setting.

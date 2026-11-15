@@ -1,7 +1,7 @@
 """Reports: month-end balances, net worth (Total / Liquid / Investment),
 income vs expenses, spending by category, and changes by account type.
 Read-only; the figures come from engine/reports.py, the settings (ignored,
-not liquid, investment and asset-valued accounts) from the Settings page."""
+not liquid and investment accounts) from the Settings page."""
 
 import datetime
 
@@ -122,7 +122,7 @@ def month_end():
     ignored.sort(key=lambda r: r['name'].lower())
     return render_template('reports_month_end.html', month=month, prev=prev, next=R.shift(month, 1),
                            current=_this_month(), groups=sorted(groups.values(), key=lambda g: _type_key(g['type'])),
-                           ignored=ignored, totals=totals, **_common(d))
+                           ignored=ignored, totals=totals, unlinked=snap['unlinked'], **_common(d))
 
 
 @bp.route('/net-worth')

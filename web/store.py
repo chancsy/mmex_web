@@ -92,7 +92,6 @@ PREF_DEFAULTS = {
     'report_ignored_accounts': [],     # a separate "wallet": left out of every report
     'nonliquid_accounts': None,        # in Total, not in Liquid
     'investment_accounts': [],         # in Investment (must be liquid)
-    'asset_valued_accounts': {},       # {account id (str): ASSETS_V1 id}: valued by that asset's rule
 }
 
 NONLIQUID_TYPES = ('Asset', 'Loan')
@@ -105,8 +104,7 @@ def report_config(prefs, account_types) -> dict:
     if nonliquid is None:
         nonliquid = [a for a, t in account_types.items() if t in NONLIQUID_TYPES]
     return {'ignored': set(prefs['report_ignored_accounts']), 'nonliquid': set(nonliquid),
-            'investment': set(prefs['investment_accounts']),
-            'assets': {int(k): v for k, v in (prefs['asset_valued_accounts'] or {}).items()}}
+            'investment': set(prefs['investment_accounts'])}
 
 
 def transids(journal) -> list:

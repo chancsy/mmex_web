@@ -268,7 +268,8 @@ def month_end():
                          'currency': symbols.get(a['currency']), 'balance': a['own'][month],
                          'change': round(a['own'][month] - a['own'][prev], 2), 'rate': a['rate'][month],
                          'base_balance': round(a['base'][month], 2), 'ignored': a['ignored'], 'liquid': a['liquid'],
-                         'investment': a['investment'], 'asset': a['asset']['name'] if a['asset'] else None})
+                         'investment': a['investment'], 'cash': a['cash'][month],
+                         'assets': [x['name'] for x in a['assets']]})
             if not a['ignored']:
                 totals['total'] += a['base'][month]
                 totals['liquid'] += a['base'][month] if a['liquid'] else 0

@@ -1,5 +1,5 @@
 """Reports: month-end balances, net worth, income vs expenses, categories,
-asset-valued accounts, their pages, settings and API.
+MMEX asset values, their pages, settings and API.
 
     python -m unittest tests.test_reports -v
 """
@@ -43,6 +43,42 @@ def setup_rates(path):
                  "(1, '2026-01-01', 'Car', 'Open', ?, 'Percentage', 500, 'Depreciates', '', 10, 'Automobile')", (fx.EUR,))
     conn.commit()
     conn.close()
+
+
+D = 10 / 36500     # the test assets' daily rate (10% a year, depreciating)
+ROW = ('INSERT INTO CHECKINGACCOUNT_V1 (TRANSID, ACCOUNTID, TOACCOUNTID, PAYEEID, TRANSCODE, TRANSAMOUNT, STATUS, '
+       "TRANSACTIONNUMBER, NOTES, CATEGID, TRANSDATE, FOLLOWUPID, TOTRANSAMOUNT, LASTUPDATEDTIME, DELETEDTIME, COLOR) "
+       "VALUES (?, ?, ?, -1, ?, ?, ?, '', '', -1, ?, -1, ?, '2026-01-01T00:00:00', '', -1)")
+CAR_ACCT, BOATS_ACCT = 10, 11
+
+
+def setup_assets(path):
+    """After setup_rates: Asset accounts "Car" (holds the asset Car by its
+    name) and "Boats" (holds the asset Dinghy by its type), and an asset
+    "Land" with no account. Dinghy's linked rows: Buy 300 (Jan 10, after a
+    plain transfer of 300 into Boats), Revalue to 250 (Jan 20), Sell 50
+    (Feb 5, into Cash (USD)), and a void Buy that doesn't count."""
+    conn = sqlite3.connect(path)
+    conn.executemany('INSERT INTO ACCOUNTLIST_V1 (ACCOUNTID, ACCOUNTNAME, ACCOUNTTYPE, STATUS, FAVORITEACCT, CURRENCYID, '
+                     "INITIALBAL, INITIALDATE) VALUES (?, ?, 'Asset', 'Open', 'FALSE', ?, 0, '2026-01-01')",
+                     [(CAR_ACCT, 'Car', fx.USD), (BOATS_ACCT, 'Boats', fx.USD)])
+    conn.executemany("INSERT INTO ASSETS_V1 (ASSETID, STARTDATE, ASSETNAME, ASSETSTATUS, CURRENCYID, VALUECHANGEMODE, "
+                     "VALUE, VALUECHANGE, NOTES, VALUECHANGERATE, ASSETTYPE) VALUES "
+                     "(?, '2026-01-01', ?, 'Open', -1, 'Percentage', ?, ?, '', 10, ?)",
+                     [(2, 'Dinghy', 999, 'Depreciates', 'Boats'), (3, 'Land', 100, 'Appreciates', 'Property')])
+    conn.executemany(ROW, [(7001, CASH_USD, BOATS_ACCT, 'Transfer', 300, '', '2026-01-09T00:00:00', 300),
+                           (7002, BOATS_ACCT, -1, 'Withdrawal', 300, '', '2026-01-10T00:00:00', 300),
+                           (7003, BOATS_ACCT, BOATS_ACCT, 'Transfer', 250, '', '2026-01-20T00:00:00', 250),
+                           (7004, CASH_USD, -1, 'Deposit', 50, '', '2026-02-05T00:00:00', 50),
+                           (7005, BOATS_ACCT, -1, 'Withdrawal', 40, 'V', '2026-02-06T00:00:00', 40)])
+    conn.executemany("INSERT INTO TRANSLINK_V1 (CHECKINGACCOUNTID, LINKTYPE, LINKRECORDID) VALUES (?, 'Asset', 2)",
+                     [(7002,), (7003,), (7004,), (7005,)])
+    conn.commit()
+    conn.close()
+
+
+DINGHY_FEB = (250 * math.exp(-16 * D) - 50) * math.exp(-23 * D)
+CAR_FEB_EUR = 500 * math.exp(-58 * D)
 
 
 class MonthTests(unittest.TestCase):
@@ -104,15 +140,40 @@ class EngineTests(unittest.TestCase):
         self.assertAlmostEqual(row['total'], 70 * 1.2)
         self.assertEqual(row['investment'], 0)
 
-    def test_asset_valued_account(self):
-        asset = R.assets(self.conn)[1]
-        self.assertEqual((asset['name'], asset['change'], asset['rate'], asset['start']), ('Car', 'Depreciates', 10.0, '2026-01-01'))
-        self.assertEqual(R.asset_factor(asset, '2025-12-31'), 1.0)
-        self.assertAlmostEqual(R.asset_factor(asset, '2026-02-28'), math.exp(-10 / 36500 * 58))
-        self.assertAlmostEqual(R.asset_factor(dict(asset, change='Appreciates'), '2026-02-28'), math.exp(10 / 36500 * 58))
-        self.assertEqual(R.asset_factor(dict(asset, change='None'), '2026-02-28'), 1.0)
-        snap = R.snapshot(self.conn, ['2026-02'], {'assets': {str(BANK): 1}})
-        self.assertAlmostEqual(snap['accounts'][BANK]['own']['2026-02'], round(BANK_JAN * math.exp(-10 / 36500 * 58), 2))
+    def test_asset_values(self):
+        setup_assets(self.path)
+        found = R.assets(self.conn)
+        car, dinghy = found[1], found[2]
+        self.assertEqual((car['name'], car['change'], car['rate'], car['start'], car['currency'], car['links']),
+                         ('Car', 'Depreciates', 10.0, '2026-01-01', fx.EUR, []))
+        # Unlinked: VALUE grown from the start date; 0 before it.
+        self.assertEqual(R.asset_value(car, '2025-12-31'), 0)
+        self.assertAlmostEqual(R.asset_value(car, '2026-02-28'), CAR_FEB_EUR)
+        self.assertAlmostEqual(R.asset_value(dict(car, change='Appreciates'), '2026-02-28'), 500 * math.exp(58 * D))
+        self.assertEqual(R.asset_value(dict(car, change='None'), '2026-02-28'), 500)
+        rates = R.Rates(self.conn)
+        self.assertAlmostEqual(R.asset_value(car, '2026-02-28', rates), CAR_FEB_EUR * 1.2, msg='in the base currency')
+        # Linked: VALUE ignored; Buy, Revalue, Sell, growth between; the void row skipped.
+        self.assertEqual([x[1] for x in dinghy['links']], [7002, 7003, 7004])
+        self.assertEqual(R.asset_value(dinghy, '2026-01-09', rates), 0, 'linked, nothing yet')
+        self.assertAlmostEqual(R.asset_value(dinghy, '2026-01-15', rates), 300 * math.exp(-5 * D))
+        self.assertAlmostEqual(R.asset_value(dinghy, '2026-01-20', rates), 250)
+        self.assertAlmostEqual(R.asset_value(dinghy, '2026-02-28', rates), DINGHY_FEB)
+        # Accounts hold assets by name, else by type; Land has no account.
+        snap = R.snapshot(self.conn, ['2026-01', '2026-02'], {})
+        accts = snap['accounts']
+        self.assertEqual([x['name'] for x in accts[CAR_ACCT]['assets']], ['Car'])
+        self.assertEqual([x['name'] for x in accts[BOATS_ACCT]['assets']], ['Dinghy'])
+        self.assertEqual([x['name'] for x in snap['unlinked']], ['Land'])
+        self.assertEqual(accts[BANK]['assets'], [])
+        self.assertAlmostEqual(accts[CAR_ACCT]['own']['2026-02'], round(CAR_FEB_EUR * 1.2, 2))
+        self.assertEqual(accts[BOATS_ACCT]['cash']['2026-02'], 0, 'the transfer in paid for the Buy')
+        self.assertAlmostEqual(accts[BOATS_ACCT]['own']['2026-02'], round(DINGHY_FEB, 2))
+        # Buying and selling the asset isn't income or spending.
+        lines = R.flows(self.conn, core.Ref(self.conn), '2026-01-01', '2026-02-28')
+        jan, feb = R.income_expense(lines, ['2026-01', '2026-02'])
+        self.assertAlmostEqual(jan['expenses'], 20.5 * 1.1)
+        self.assertEqual(feb['income'], 0)
 
     def test_income_expense_and_categories(self):
         ref = core.Ref(self.conn)
@@ -168,7 +229,6 @@ class ReportPageTests(QueueTestsBase):
     def test_settings(self):
         page = self.client.get('/settings').text
         self.assertIn('id="reports"', page)
-        self.assertIn('Car (depreciates 10.0%)', page)
         self.assertIn('Not saved yet', page)
         # Both investment and not liquid: refused, nothing saved.
         r = self.client.post('/settings/reports', data={'csrf_token': csrf(page), 'nonliquid': str(BANK),
@@ -176,15 +236,22 @@ class ReportPageTests(QueueTestsBase):
         self.assertIn('investment accounts must be liquid', r.text)
         self.assertIsNone(self.app.config['MMEX_STORE'].prefs()['nonliquid_accounts'])
         self.client.post('/settings/reports', data={'csrf_token': csrf(page), 'ignored': str(CASH_USD),
-                                                    'nonliquid': str(CASH), 'investment': str(BANK),
-                                                    f'asset_{CLOSED}': '1', f'asset_{BANK}': '99'})
+                                                    'nonliquid': str(CASH), 'investment': str(BANK)})
         prefs = self.app.config['MMEX_STORE'].prefs()
         self.assertEqual((prefs['report_ignored_accounts'], prefs['nonliquid_accounts'], prefs['investment_accounts']),
                          ([CASH_USD], [CASH], [BANK]))
-        self.assertEqual(prefs['asset_valued_accounts'], {str(CLOSED): 1}, 'an unknown asset id is dropped')
         page = self.client.get('/reports/month-end?month=2026-02').text
         self.assertIn('Ignored (not in totals)', page)
         self.assertIn('>not liquid</span>', page)
+
+    def test_asset_accounts(self):
+        setup_assets(self.db)
+        page = self.client.get('/reports/month-end?month=2026-02').text
+        self.assertIn('>incl. asset</span>', page)
+        self.assertIn('Not counted: MMEX asset with no asset account of the same name: Land.', page)
+        body = self.api('get', '/reports/month-end?month=2026-02', token=self.recon).get_json()
+        boats = next(a for a in body['accounts'] if a['id'] == BOATS_ACCT)
+        self.assertEqual((boats['cash'], boats['assets'], boats['balance']), (0, ['Dinghy'], round(DINGHY_FEB, 2)))
 
     def test_api_month_end(self):
         r = self.api('get', '/reports/month-end?month=2026-02', token=self.recon)

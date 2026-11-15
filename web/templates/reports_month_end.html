@@ -7,7 +7,7 @@
     {%- if r.status != 'Open' %} <span class="chip">{{ r.status }}</span>{% endif %}
     {%- if not r.ignored and not r.liquid %} <span class="chip">not liquid</span>{% endif %}
     {%- if r.investment %} <span class="chip">investment</span>{% endif %}
-    {%- if r.asset %} <span class="chip" title="Valued by the MMEX asset {{ r.asset.name }}: {{ r.asset.change | lower }} {{ r.asset.rate }}% a year since {{ r.asset.start }}">asset value</span>{% endif %}</th>
+    {%- if r.assets %} <span class="chip" title="The account's balance plus the MMEX asset{{ 's' if r.assets | length > 1 }} {{ r.assets | map(attribute='name') | join(', ') }}">incl. asset</span>{% endif %}</th>
   {% set cur = currencies.get(r.currency) %}
   <td class="num">{{ r.now | secret(cur) }}</td>
   <td class="num">{{ delta(r.change, cur) }}</td>
@@ -45,5 +45,6 @@
   </tbody>
   {% endif %}
 </table></div>
-<p class="small muted">Balance and Change are in each account's own currency (Change is what moved since {{ prev }}'s end); group rows and "In {{ base.symbol if base else 'base' }}" are converted at {{ month }}'s month-end rate. Closed accounts appear only while they hold a balance.</p>
+<p class="small muted">Balance and Change are in each account's own currency (Change is what moved since {{ prev }}'s end); group rows and "In {{ base.symbol if base else 'base' }}" are converted at {{ month }}'s month-end rate. Closed accounts appear only while they hold a balance. An asset account includes the value of the MMEX assets it holds, as MMEX works it out (the asset named like the account, or its type; buys, sells and revaluations linked to it).</p>
+{% if unlinked %}<p class="small muted">Not counted: MMEX asset{{ 's' if unlinked | length > 1 }} with no asset account of the same name: {{ unlinked | map(attribute='name') | join(', ') }}.</p>{% endif %}
 {% endblock %}
