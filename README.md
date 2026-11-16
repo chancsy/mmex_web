@@ -139,7 +139,7 @@ automation (e.g. a bill fetcher) ──POST /api/queue──► queue ──you 
     - **Net worth:** Total, Liquid and Investment each month with their
       changes, and how much of Total's change came only from exchange
       rates. Investment's change leaves out transfers into or out of
-      investment accounts (shown apart as Transfers).
+      investment accounts.
     - **Income vs expenses:** each month's income (deposits), expenses
       (withdrawals), net and savings rate. Transfers and rows linked to an
       asset never count; split rows count under their split categories.

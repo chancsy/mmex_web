@@ -253,7 +253,7 @@ class ReportPageTests(QueueTestsBase):
         self.assertNotIn('transfers)', page, 'nothing moved into Investment in February')
         jan = self.client.get('/reports/month-end?month=2026-01').text
         self.assertIn('transfers)', jan)           # Bank (investment) sent 100 to Cash (EUR)
-        self.assertIn('>Transfers</th>', self.client.get('/reports/net-worth?end=2026-02&n=3').text)
+        self.assertNotIn('>Transfers</th>', self.client.get('/reports/net-worth?end=2026-02&n=3').text, 'column hidden')
 
     def test_asset_accounts(self):
         setup_assets(self.db)

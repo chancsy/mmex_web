@@ -15,17 +15,17 @@
   {% endfor %}
 </section>
 <div class="tablewrap"><table class="report">
-  <thead><tr><th>Month</th><th>Total</th><th>Change</th><th>Liquid</th><th>Change</th>{% if inv %}<th>Investment</th><th title="Without money moved into or out of investment accounts">Change</th><th title="Net transfers into investment accounts from other accounts (not counted as a change)">Transfers</th>{% endif %}<th title="The part of Total's change that came only from exchange-rate moves on foreign-currency balances">From rates</th></tr></thead>
+  <thead><tr><th>Month</th><th>Total</th><th>Change</th><th>Liquid</th><th>Change</th>{% if inv %}<th>Investment</th><th title="Without money moved into or out of investment accounts">Change</th>{% endif %}<th title="The part of Total's change that came only from exchange-rate moves on foreign-currency balances">From rates</th></tr></thead>
   <tbody>
   {% for r in rows %}
   <tr><th scope="row"><a href="{{ url_for('reports.month_end', month=r.month) }}">{{ r.month }}</a></th>
     <td class="num">{{ r.total | secret(base) }}</td><td class="num">{{ delta(r.d_total, base) }}</td>
     <td class="num">{{ r.liquid | secret(base) }}</td><td class="num">{{ delta(r.d_liquid, base) }}</td>
-    {% if inv %}<td class="num">{{ r.investment | secret(base) }}</td><td class="num">{{ delta(r.d_investment, base) }}</td><td class="num muted">{{ delta(r.moved_investment, base) }}</td>{% endif %}
+    {% if inv %}<td class="num">{{ r.investment | secret(base) }}</td><td class="num">{{ delta(r.d_investment, base) }}</td>{% endif %}
     <td class="num muted">{{ delta(r.fx, base) }}</td></tr>
   {% endfor %}
   </tbody>
 </table></div>
 {% endif %}
-<p class="small muted">Total counts every account except ignored ones; Liquid leaves out the ones marked not liquid; Investment is the ones marked investment (part of Liquid); its Change leaves out money moved into or out of those accounts (shown as Transfers), so it's what rates and real transactions did. Each month at its month-end rates. "From rates" is how much of Total's change came only from exchange-rate moves on foreign-currency balances. Choose accounts in <a href="{{ url_for('settings.settings', _anchor='reports') }}">Settings</a>.</p>
+<p class="small muted">Total counts every account except ignored ones; Liquid leaves out the ones marked not liquid; Investment is the ones marked investment (part of Liquid); its Change leaves out money moved into or out of those accounts, so it's what rates and real transactions did. Each month at its month-end rates. "From rates" is how much of Total's change came only from exchange-rate moves on foreign-currency balances. Choose accounts in <a href="{{ url_for('settings.settings', _anchor='reports') }}">Settings</a>.</p>
 {% endblock %}
