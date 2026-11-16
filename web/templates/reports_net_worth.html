@@ -4,21 +4,29 @@
 {% block content %}
 <div class="heading"><h1>Net worth</h1></div>
 {{ tabs(pages, 'reports.net_worth') }}
-{{ span_form(span, years, 'reports.net_worth') }}
+<p class="rby small">By <a href="{{ url_for('reports.net_worth', by='month') }}"{% if span.by == 'month' %} aria-current="page"{% endif %}>month</a> · <a href="{{ url_for('reports.net_worth', by='year') }}"{% if span.by == 'year' %} aria-current="page"{% endif %}>year</a></p>
+{% if span.by == 'year' %}
+<form method="get" class="card rspan"><input type="hidden" name="by" value="year">
+  <label>Last <select name="n">{% for s in span.spans %}<option value="{{ s }}"{% if s == span.n %} selected{% endif %}>{{ s }} years</option>{% endfor %}</select></label>
+  <button type="submit" class="mini">Show</button></form>
+{% else %}
+{{ span_form(span, years, 'reports.net_worth', {'by': 'month'}) }}
+{% endif %}
+{% set unit = span.by %}
 {% set inv = rows | selectattr('investment') | list | length > 0 %}
 {% if rows %}
 {% set last = rows[-1] %}
 <section class="card totals rtotals">
   {% for key, label in [('total', 'Total'), ('liquid', 'Liquid')] + ([('investment', 'Investment')] if inv else []) %}
-  <div><span class="label">{{ label }} at {{ last.month }}</span><span class="num big">{{ last[key] | secret(base) }}</span>
-    <span class="num small">{{ delta(rows | sum(attribute='d_' ~ key), base) }} over {{ rows | length }} month{{ '' if rows | length == 1 else 's' }}</span></div>
+  <div><span class="label">{{ label }} at {{ last.end or last.month }}</span><span class="num big">{{ last[key] | secret(base) }}</span>
+    <span class="num small">{{ delta(rows | sum(attribute='d_' ~ key), base) }} over {{ rows | length }} {{ unit }}{{ '' if rows | length == 1 else 's' }}</span></div>
   {% endfor %}
 </section>
 <div class="tablewrap"><table class="report">
-  <thead><tr><th>Month</th><th>Total</th><th>Change</th><th>Liquid</th><th>Change</th>{% if inv %}<th>Investment</th><th title="Without money moved into or out of investment accounts">Change</th>{% endif %}<th title="The part of Total's change that came only from exchange-rate moves on foreign-currency balances">From rates</th></tr></thead>
+  <thead><tr><th>{{ 'Year' if unit == 'year' else 'Month' }}</th><th>Total</th><th>Change</th><th>Liquid</th><th>Change</th>{% if inv %}<th>Investment</th><th title="Without money moved into or out of investment accounts">Change</th>{% endif %}<th title="The part of Total's change that came only from exchange-rate moves on foreign-currency balances">From rates</th></tr></thead>
   <tbody>
   {% for r in rows %}
-  <tr><th scope="row"><a href="{{ url_for('reports.month_end', month=r.month) }}">{{ r.month }}</a></th>
+  <tr><th scope="row"><a href="{{ url_for('reports.month_end', month=r.end or r.month) }}">{{ r.month }}</a>{% if r.end and r.end[5:] != '12' %} <span class="small muted">to {{ r.end | ym }}</span>{% endif %}</th>
     <td class="num">{{ r.total | secret(base) }}</td><td class="num">{{ delta(r.d_total, base) }}</td>
     <td class="num">{{ r.liquid | secret(base) }}</td><td class="num">{{ delta(r.d_liquid, base) }}</td>
     {% if inv %}<td class="num">{{ r.investment | secret(base) }}</td><td class="num">{{ delta(r.d_investment, base) }}</td>{% endif %}
@@ -27,5 +35,5 @@
   </tbody>
 </table></div>
 {% endif %}
-<p class="small muted">Total counts every account except ignored ones; Liquid leaves out the ones marked not liquid; Investment is the ones marked investment, liquid or not; its Change leaves out money moved into or out of those accounts, so it's what rates and real transactions did. Each month at its month-end rates. "From rates" is how much of Total's change came only from exchange-rate moves on foreign-currency balances. Choose accounts in <a href="{{ url_for('settings.settings', _anchor='accounts') }}">Settings</a>.</p>
+<p class="small muted">Total counts every account except ignored ones; Liquid leaves out the ones marked not liquid; Investment is the ones marked investment, liquid or not; its Change leaves out money moved into or out of those accounts, so it's what rates and real transactions did. Each month at its month-end rates.{% if unit == 'year' %} A year's figures are at its December (the current year: the last full month); its changes are its months' changes added up, so Total's and Liquid's are December to December.{% endif %} "From rates" is how much of Total's change came only from exchange-rate moves on foreign-currency balances. Choose accounts in <a href="{{ url_for('settings.settings', _anchor='accounts') }}">Settings</a>.</p>
 {% endblock %}

@@ -140,6 +140,13 @@ class EngineTests(unittest.TestCase):
         self.assertAlmostEqual(jan['d_investment'], (3.21 - 20.5) * 1.1)
         self.assertEqual(feb['moved_investment'], 0)
         self.assertAlmostEqual(feb['d_investment'], BANK_JAN * 0.1)
+        # By year: levels at the year's last month, changes and fx added up.
+        (y,) = R.by_year([jan, feb])
+        self.assertEqual((y['month'], y['end']), ('2026', '2026-02'))
+        self.assertAlmostEqual(y['total'], feb['total'])
+        self.assertAlmostEqual(y['d_total'], feb['total'] - R.net_worth(R.snapshot(self.conn, ['2025-11', '2025-12'], cfg))[0]['total'])
+        for k in ('d_liquid', 'd_investment', 'moved_investment', 'fx'):
+            self.assertAlmostEqual(y[k], jan[k] + feb[k], msg=k)
         # Ignored accounts leave every figure; an investment can be not liquid.
         snap = R.snapshot(self.conn, ['2026-01', '2026-02'], {'ignored': {BANK}, 'investment': {CASH}, 'nonliquid': {CASH}})
         row = R.net_worth(snap)[0]
@@ -230,7 +237,10 @@ class ReportPageTests(QueueTestsBase):
         acc = self.client.get('/reports/accounts?by=month&end=2026-02&n=3').text
         self.assertIn('Bank Accounts', acc)
         self.assertEqual(self.client.get('/reports/accounts?by=year&n=3').status_code, 200)
-        for bad in ('/reports/net-worth?n=7', '/reports/income?end=2026-13', '/reports/month-end?month=x',
+        nwy = self.client.get('/reports/net-worth?by=year&n=3')
+        self.assertEqual(nwy.status_code, 200)
+        self.assertIn('<th>Year</th>', nwy.text)
+        for bad in ('/reports/net-worth?n=7', '/reports/net-worth?by=year&n=4', '/reports/income?end=2026-13', '/reports/month-end?month=x',
                     '/reports/accounts?by=week', '/reports/categories?year=26'):
             self.assertEqual(self.client.get(bad).status_code, 400, bad)
 

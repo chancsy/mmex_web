@@ -136,7 +136,7 @@ automation (e.g. a bill fetcher) ──POST /api/queue──► queue ──you 
       like the account, or like its type), valued as MMEX does: its value
       grown at its rate from its start date, or, once transactions are
       linked to it, the buys, sells and revaluations, grown between them.
-    - **Net worth:** Total, Liquid and Investment each month with their
+    - **Net worth:** Total, Liquid and Investment by month or by year with their
       changes, and how much of Total's change came only from exchange
       rates. Investment's change leaves out transfers into or out of
       investment accounts.

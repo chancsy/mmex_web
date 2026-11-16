@@ -355,6 +355,25 @@ def net_worth(snap) -> list:
     return out
 
 
+def by_year(rows) -> list:
+    """net_worth() rows folded into calendar years: total, liquid and
+    investment at each year's last month (its 'end'), and the changes,
+    moved_investment and fx added up over the year's months. Adding the
+    monthly changes gives the December-to-December change; for Investment
+    and fx it keeps each month's own rule."""
+    out = {}
+    for r in rows:
+        y = r['month'][:4]
+        if y not in out:
+            out[y] = dict(r, month=y, end=r['month'])
+            continue
+        o = out[y]
+        for k in ('d_total', 'd_liquid', 'd_investment', 'moved_investment', 'fx'):
+            o[k] += r[k]
+        o.update(total=r['total'], liquid=r['liquid'], investment=r['investment'], end=r['month'])
+    return list(out.values())
+
+
 # -- income and expenses -------------------------------------------------------
 
 def flows(conn, ref, date_from, date_to, ignored=()) -> list:

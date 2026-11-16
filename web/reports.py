@@ -60,6 +60,28 @@ def _span():
     return end, n, {'end': end, 'n': n, 'year': year, 'current': current, 'spans': SPANS}
 
 
+def _by():
+    by = request.args.get('by', 'month')
+    if by not in ('month', 'year'):
+        abort(400, 'by must be month or year')
+    return by
+
+
+def _year_span():
+    """(year labels, last full month, range info) for ?by=year&n=N: the
+    last N calendar years, the current one to the last full month."""
+    try:
+        n = int(request.args.get('n', '5'))
+    except ValueError:
+        abort(400, 'n must be a number')
+    if n not in YEAR_SPANS:
+        abort(400, f'n must be one of {", ".join(map(str, YEAR_SPANS))}')
+    current = _this_month()
+    last = R.shift(current, -1)
+    cols = [str(y) for y in range(int(last[:4]) - n + 1, int(last[:4]) + 1)]
+    return cols, last, {'by': 'year', 'n': n, 'spans': YEAR_SPANS, 'current': current, 'end': last}
+
+
 def _years(d):
     first = R.first_month(d.conn) or _this_month()
     return list(range(int(_this_month()[:4]), int(first[:4]) - 1, -1))
@@ -133,9 +155,17 @@ def month_end():
 @login_required
 def net_worth():
     d = db()
-    end, n, span = _span()
-    snap = R.snapshot(d.conn, R.months(end, n + 1), config(d))
-    rows = R.net_worth(snap)
+    if _by() == 'year':
+        cols, last, span = _year_span()
+        # Every month from the December before the first year, so each
+        # year's changes are its months' changes added up.
+        first = f'{int(cols[0]) - 1}-12'
+        count = (int(last[:4]) - int(first[:4])) * 12 + int(last[5:]) - int(first[5:]) + 1
+        rows = R.by_year(R.net_worth(R.snapshot(d.conn, R.months(last, count), config(d))))
+    else:
+        end, n, span = _span()
+        span['by'] = 'month'
+        rows = R.net_worth(R.snapshot(d.conn, R.months(end, n + 1), config(d)))
     return render_template('reports_net_worth.html', rows=rows, span=span, **_common(d))
 
 
@@ -172,24 +202,12 @@ def categories():
 @login_required
 def account_changes():
     d = db()
-    by = request.args.get('by', 'month')
-    if by not in ('month', 'year'):
-        abort(400, 'by must be month or year')
-    current = _this_month()
+    by = _by()
     if by == 'year':
-        try:
-            n = int(request.args.get('n', '5'))
-        except ValueError:
-            abort(400, 'n must be a number')
-        if n not in YEAR_SPANS:
-            abort(400, f'n must be one of {", ".join(map(str, YEAR_SPANS))}')
-        last = R.shift(current, -1)
-        last_year = int(last[:4])
+        cols, last, span = _year_span()
         # Each column is a year: from the previous December to this one (or
         # to the last full month, for the current year).
-        cols = [str(y) for y in range(last_year - n + 1, last_year + 1)]
         points = [f'{int(cols[0]) - 1}-12'] + [min(f'{y}-12', last) for y in cols]
-        span = {'by': by, 'n': n, 'spans': YEAR_SPANS, 'current': current, 'end': last}
     else:
         end, n, span = _span()
         points = R.months(end, n + 1)
