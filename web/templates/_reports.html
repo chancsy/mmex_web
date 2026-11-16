@@ -1,0 +1,21 @@
+{# Shared pieces of the report pages. #}
+{% macro tabs(pages, here) %}
+<nav class="rtabs" aria-label="Reports">{% for ep, label, _ in pages %}<a href="{{ url_for(ep) }}"{% if ep == here %} aria-current="page"{% endif %}>{{ label }}</a>{% endfor %}</nav>
+{% endmacro %}
+
+{# A signed change: +1.00 in green, -1.00 in red; hideable with the eye when hide is set. #}
+{% macro delta(v, cur, hide=True) -%}
+<span class="{{ 'neg' if v < -0.005 else 'pos' if v > 0.005 }}">{{ '+' if v > 0.005 }}{{ v | secret(cur) if hide else v | money(cur) }}</span>
+{%- endmacro %}
+
+{% macro span_form(span, years, endpoint, extra={}) %}
+<form method="get" class="card rspan">
+  {% for k, v in extra.items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+  <label>Last <select name="n">{% for s in span.spans %}<option value="{{ s }}"{% if s == span.n and not span.year %} selected{% endif %}>{{ s }} months</option>{% endfor %}</select></label>
+  <label>to <input type="month" name="end" value="{{ span.end }}" max="{{ span.current }}"></label>
+  <button type="submit" class="mini">Show</button>
+  <span class="years small">Year: {% for y in years %}<a href="{{ url_for(endpoint, year=y, **extra) }}"{% if span.year == y | string %} aria-current="page"{% endif %}>{{ y }}</a>{% endfor %}</span>
+</form>
+{% endmacro %}
+
+{% macro note(text) %}<p class="small muted">{{ text }}</p>{% endmacro %}

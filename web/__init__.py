@@ -17,7 +17,8 @@ from flask_wtf.csrf import CSRFError, CSRFProtect
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import safe_join
 
-from . import api, auth, entry, pages, queue as queue_page, rates as rates_page, secrets_file, settings as settings_page
+from . import api, auth, entry, pages, queue as queue_page, rates as rates_page, reports as reports_page, secrets_file, \
+    settings as settings_page
 from .config import Settings
 from .store import Store
 from .writer import Writer
@@ -121,6 +122,7 @@ def create_app(settings=None):
     app.register_blueprint(settings_page.bp)
     app.register_blueprint(rates_page.bp)
     app.register_blueprint(queue_page.bp)
+    app.register_blueprint(reports_page.bp)
     app.jinja_env.filters['money'] = _money
     app.jinja_env.filters['localtime'] = _localtime
     app.jinja_env.filters['secret'] = _secret

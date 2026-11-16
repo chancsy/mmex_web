@@ -44,4 +44,39 @@
   </section>
   <div class="actions"><button type="submit">Save settings</button></div>
 </form>
+
+<form method="post" action="{{ url_for('settings.report_settings') }}" class="settings" id="reports">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <section class="card">
+    <h2>Reports</h2>
+    <p class="small muted tight"><strong>Ignore</strong>: a separate "wallet", left out of every report (totals, income and expenses). <strong>Not liquid</strong>: counted in Total but not Liquid (e.g. property, loans, retirement funds). <strong>Investment</strong>: counted in Investment, which is part of Liquid. An asset account's value includes the MMEX assets it holds (see Reports).{% if report.defaulted %} Not saved yet: asset and loan accounts are ticked Not liquid until you save.{% endif %}</p>
+    {% set cfg = report.cfg %}
+    {% macro report_rows(g) %}
+    <tbody>
+      <tr class="gh"><th scope="rowgroup" colspan="4">{{ g.label }}</th></tr>
+      {% for a in g.accounts %}
+      <tr><th scope="row">{{ a.name }}</th>
+        <td><input type="checkbox" name="ignored" value="{{ a.id }}" aria-label="Ignore {{ a.name }}"{% if a.id in cfg.ignored %} checked{% endif %}></td>
+        <td><input type="checkbox" name="nonliquid" value="{{ a.id }}" aria-label="{{ a.name }} not liquid"{% if a.id in cfg.nonliquid %} checked{% endif %}></td>
+        <td><input type="checkbox" name="investment" value="{{ a.id }}" aria-label="{{ a.name }} investment"{% if a.id in cfg.investment %} checked{% endif %}></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    {% endmacro %}
+    {% macro report_table(groups) %}
+    <div class="tablewrap"><table class="report rsettings">
+      <thead><tr><th>Account</th><th>Ignore</th><th>Not liquid</th><th>Investment</th></tr></thead>
+      {% for g in groups %}{{ report_rows(g) }}{% endfor %}
+    </table></div>
+    {% endmacro %}
+    {{ report_table(report.groups | rejectattr('closed') | list) }}
+    {% set closed = report.groups | selectattr('closed') | list %}
+    {% if closed %}
+    <details class="keeppick"><summary>Closed accounts ({{ closed | map(attribute='accounts') | map('length') | sum }})</summary>
+      {{ report_table(closed) }}
+    </details>
+    {% endif %}
+  </section>
+  <div class="actions"><button type="submit">Save report settings</button></div>
+</form>
 {% endblock %}

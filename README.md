@@ -6,9 +6,9 @@ A self-hosted web app for [Money Manager Ex](https://moneymanagerex.org/)
 loaded from a CDN. Light enough for a Raspberry Pi.
 
 Status: in daily use by its author. Accounts, registers, entry and edit
-with undo, reconciliation flags, currency rates, and a queue (with a JSON
-API) through which other programs propose entries for approval. Reports
-(month-end balances, net worth, income vs expenses) are planned.
+with undo, reconciliation flags, currency rates, monthly reports, and a
+queue (with a JSON API) through which other programs propose entries for
+approval.
 
 <!-- TODO: add screenshots of the app (accounts, register, entry form, reconcile, queue) once the UI is further along. -->
 
@@ -128,10 +128,33 @@ automation (e.g. a bill fetcher) ──POST /api/queue──► queue ──you 
     Refresh fetches a date again. Rates can also be typed (stored as typed),
     changed or deleted per date. Rate changes are backed up like any write
     but aren't in History.
+  - **Reports** (read-only; amounts in the base currency, balances at
+    each month-end's rate, income and expenses at the rate on their date):
+    - **Month-end balances:** every account at a chosen month-end, in its
+      own currency and converted, with its change from the month before.
+      An asset account includes the MMEX assets it holds (the asset named
+      like the account, or like its type), valued as MMEX does: its value
+      grown at its rate from its start date, or, once transactions are
+      linked to it, the buys, sells and revaluations, grown between them.
+    - **Net worth:** Total, Liquid and Investment each month with their
+      changes, and how much of Total's change came only from exchange
+      rates. Investment's change leaves out transfers into or out of
+      investment accounts.
+    - **Income vs expenses:** each month's income (deposits), expenses
+      (withdrawals), net and savings rate. Transfers and rows linked to an
+      asset never count; split rows count under their split categories.
+    - **By category:** categories × months with total and average;
+      top-level categories expand to their subcategories.
+    - **Account changes:** how each account type changed by month or by
+      year; types expand to their accounts.
+    - Ranges: the last 3 to 36 months to a chosen month, or a calendar year.
   - **Settings:** favourite accounts first, hide balances, accounts to
     hide in a collapsed "Others" list at the bottom of their group, the
-    Twin notes pattern, and extra currencies to keep rates for. Kept in
-    `app.db`, so they're the same on every device.
+    Twin notes pattern, and extra currencies to keep rates for. For the
+    reports, per account: **Ignore** (a separate "wallet", left out of
+    every report), **Not liquid** (in Total, not Liquid; asset and loan
+    accounts until first saved) and **Investment** (part of Liquid). Kept
+    in `app.db`, so they're the same on every device.
   - **Light or dark:** a button in the top bar, remembered per device (a
     cookie); until it's used, the page follows the system setting.
 - **Login:** one user, with a password set from the command line. There's
@@ -173,6 +196,7 @@ automation (e.g. a bill fetcher) ──POST /api/queue──► queue ──you 
     | `GET /api/balance?account=&as_of=` | An account's balance, the engine's way. |
     | `GET /api/find?account=&from=&to=&amount=&payee=&category=&notes=&id=&include_deleted=&limit=` | Transactions, as plan-level fields. |
     | `GET /api/lookup/<accounts\|payees\|categories\|tags>?like=` | Names and ids. |
+    | `GET /api/reports/month-end?month=YYYY-MM` | Every account at that month-end (own currency and base), its change from the month before, its report settings, and Total / Liquid / Investment. |
 
 ### Run with Docker
 
@@ -317,6 +341,7 @@ No command has a default DB.
 | `engine/dbfile.py` | Opening DBs (read-only, in-memory, writable), guards, fingerprint. |
 | `engine/render.py` | Plain-text output for the CLI. |
 | `engine/views.py` | Read-only views for the UI: accounts, register with running balance, recent rows, entry-form pickers, near duplicates. |
+| `engine/reports.py`, `web/reports.py` | Report figures (month-end balances, rates by date, asset values, income and expenses); the Reports pages. |
 | `web/` | Flask app: settings, login, pages, templates, static files. |
 | `web/pages.py` | The read-only pages: accounts, register, recent. |
 | `web/queue.py`, `web/review.py`, `web/api.py` | The Queue pages; the review layout (twins, badges, check dividers) built from a preview; the JSON API. |

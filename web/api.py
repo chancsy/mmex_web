@@ -25,6 +25,9 @@ Endpoints:
     GET  /api/balance?account=&as_of=
     GET  /api/find?account=&from=&to=&amount=&payee=&category=&notes=&id=&include_deleted=&limit=
     GET  /api/lookup/<accounts|payees|categories|tags>?like=
+    GET  /api/reports/month-end?month=YYYY-MM
+                                 every account at that month-end (own currency
+                                 and base), its change, and Total / Liquid / Investment
 """
 
 import datetime
@@ -239,5 +242,39 @@ def lookup(kind):
         else:
             abort(404)
         return jsonify(rows=sorted((r for r in rows if like in r['name'].lower()), key=lambda r: r['name'].lower()))
+    finally:
+        d.close()
+
+
+@bp.get('/reports/month-end')
+def month_end():
+    """Every account's balance at a month's end and its change from the month
+    before (own currency, plus the base-currency value), with Total, Liquid
+    and Investment as the Reports pages count them. Ignored accounts are
+    listed (marked) but left out of the totals."""
+    from engine import reports as R
+    from .reports import config
+    month = request.args.get('month', '').strip()
+    if not R.valid_month(month):
+        abort(400, 'month must be YYYY-MM')
+    d = _read()
+    try:
+        prev = R.shift(month, -1)
+        snap = R.snapshot(d.conn, [prev, month], config(d))
+        symbols = {cid: c['symbol'] for cid, c in d.currencies.items()}
+        rows, totals = [], {'total': 0.0, 'liquid': 0.0, 'investment': 0.0}
+        for a in sorted(snap['accounts'].values(), key=lambda a: a['name'].lower()):
+            rows.append({'id': a['id'], 'name': a['name'], 'type': a['type'], 'status': a['status'],
+                         'currency': symbols.get(a['currency']), 'balance': a['own'][month],
+                         'change': round(a['own'][month] - a['own'][prev], 2), 'rate': a['rate'][month],
+                         'base_balance': round(a['base'][month], 2), 'ignored': a['ignored'], 'liquid': a['liquid'],
+                         'investment': a['investment'], 'cash': a['cash'][month],
+                         'assets': [x['name'] for x in a['assets']]})
+            if not a['ignored']:
+                totals['total'] += a['base'][month]
+                totals['liquid'] += a['base'][month] if a['liquid'] else 0
+                totals['investment'] += a['base'][month] if a['investment'] else 0
+        return jsonify(month=month, as_of=R.month_end(month), base=symbols.get(snap['base']), accounts=rows,
+                       **{k: round(v, 2) for k, v in totals.items()})
     finally:
         d.close()
