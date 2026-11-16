@@ -392,3 +392,17 @@
     label();
   }
 })();
+
+// Settings: a link or redirect to #reports (or any id) opens the folded
+// section it points into, so a save lands on what was just saved.
+(function () {
+  'use strict';
+  function openTarget() {
+    var target = location.hash && document.getElementById(location.hash.slice(1));
+    if (!target) return;
+    var fold = target.matches('details.fold') ? target : target.querySelector('details.fold');
+    if (fold) fold.open = true;
+  }
+  openTarget();
+  window.addEventListener('hashchange', openTarget);
+})();

@@ -327,6 +327,12 @@ table.balances .num { text-align: right; }
 .card h2 { font-size: 1rem; margin: 0 0 .5rem; }
 .card label.check { display: flex; align-items: center; gap: .45rem; margin-top: .6rem; }
 details.card > summary { cursor: pointer; font-weight: 600; }
+/* Settings: long sections fold, with what's ticked in the summary line. */
+details.fold > summary { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; list-style: none; user-select: none; }
+details.fold > summary::-webkit-details-marker { display: none; }
+details.fold > summary h2 { margin: 0; }
+details.fold > summary .small { font-weight: 400; }
+details.fold[open] > summary { margin-bottom: .5rem; }
 
 /* Queue review: what a batch does, as a timeline */
 .rv-summary { margin: 0 0 .5rem; padding: .45rem .7rem; background: var(--info-bg); border-radius: 8px; white-space: pre-wrap; }

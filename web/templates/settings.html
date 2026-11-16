@@ -9,8 +9,8 @@
     <label class="check"><input type="checkbox" name="favourites_first" value="1" {% if prefs.favourites_first %}checked{% endif %}> Put favourite accounts (★) first in each group</label>
     <label class="check"><input type="checkbox" name="hide_balances" value="1" {% if prefs.hide_balances %}checked{% endif %}> Hide balances (the eye in the top bar does the same)</label>
   </section>
-  <section class="card">
-    <h2>Hidden accounts</h2>
+  <details class="card fold" id="hidden">
+    <summary><span class="arrow"></span><h2>Hidden accounts</h2><span class="small muted">{{ hidden | length }} hidden</span></summary>
     <p class="small muted tight">A hidden account moves into a collapsed "Others" list at the bottom of its group on the accounts page. It still counts in the totals, and still appears everywhere else.</p>
     {% for label, accts in groups %}
     <fieldset class="hidepick">
@@ -20,7 +20,7 @@
       {% endfor %}
     </fieldset>
     {% endfor %}
-  </section>
+  </details>
   <section class="card" id="twin">
     <h2>Twin transactions</h2>
     <p class="small muted tight">The <strong>Twin</strong> type on the New page saves one purchase as two rows: a transfer from the paying account to the To account (e.g. Cash), with notes from this pattern, and a withdrawal with the real payee in the expense account (e.g. Household).</p>
@@ -47,10 +47,10 @@
 
 <form method="post" action="{{ url_for('settings.report_settings') }}" class="settings" id="reports">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <section class="card">
-    <h2>Reports</h2>
+  {% set cfg = report.cfg %}
+  <details class="card fold"{% if report.defaulted %} open{% endif %}>
+    <summary><span class="arrow"></span><h2>Reports</h2><span class="small muted">{{ cfg.ignored | length }} ignored · {{ cfg.nonliquid | length }} not liquid · {{ cfg.investment | length }} investment</span></summary>
     <p class="small muted tight"><strong>Ignore</strong>: a separate "wallet", left out of every report (totals, income and expenses). <strong>Not liquid</strong>: counted in Total but not Liquid (e.g. property, loans, retirement funds). <strong>Investment</strong>: counted in Investment, whether liquid or not. An asset account's value includes the MMEX assets it holds (see Reports).{% if report.defaulted %} Not saved yet: asset and loan accounts are ticked Not liquid until you save.{% endif %}</p>
-    {% set cfg = report.cfg %}
     {% macro report_rows(g) %}
     <tbody>
       <tr class="gh"><th scope="rowgroup" colspan="4">{{ g.label }}</th></tr>
@@ -76,7 +76,7 @@
       {{ report_table(closed) }}
     </details>
     {% endif %}
-  </section>
+  </details>
   <div class="actions"><button type="submit">Save report settings</button></div>
 </form>
 {% endblock %}
