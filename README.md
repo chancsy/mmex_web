@@ -139,21 +139,31 @@ automation (e.g. a bill fetcher) ──POST /api/queue──► queue ──you 
     - **Net worth:** Total, Liquid and Investment by month or by year with their
       changes, and how much of Total's change came only from exchange
       rates. Investment's change leaves out transfers into or out of
-      investment accounts.
+      investment accounts. A line chart draws them month by month, plus up
+      to five extra lines chosen in Settings (e.g. "Liquid + EPF": an
+      account's balance added to Liquid).
     - **Income vs expenses:** each month's income (deposits), expenses
       (withdrawals), net and savings rate. Transfers and rows linked to an
       asset never count; split rows count under their split categories.
+      A chart shows each month's net as a bar, with its 12-month average.
     - **By category:** categories × months with total and average;
-      top-level categories expand to their subcategories.
+      top-level categories expand to their subcategories. A chart ranks
+      spending by category over the range; each row has a small trend line.
     - **Account changes:** how each account type changed by month or by
-      year; types expand to their accounts.
-    - Ranges: the last 3 to 36 months to a chosen month, or a calendar year.
+      year; types expand to their accounts. A chart stacks each type's
+      gain above zero and loss below, with the net change as a dot.
+    - Ranges: the last 3 to 36 months to a chosen month, or a calendar year
+      (Net worth also: all months).
+    - Charts are drawn in the page (`web/static/charts.js`, no library);
+      the table under each has every value, and the eye hides the amounts
+      on balance charts as it does in the tables.
   - **Settings:** favourite accounts first, hide balances, accounts to
     hide in a collapsed "Others" list at the bottom of their group, the
     Twin notes pattern, and extra currencies to keep rates for. For the
     reports, per account: **Ignore** (a separate "wallet", left out of
     every report), **Not liquid** (in Total, not Liquid; asset and loan
-    accounts until first saved) and **Investment** (liquid or not). Kept
+    accounts until first saved) and **Investment** (liquid or not), and
+    the Net worth chart's extra lines. Kept
     in `app.db`, so they're the same on every device.
   - **Light or dark:** a button in the top bar, remembered per device (a
     cookie); until it's used, the page follows the system setting.

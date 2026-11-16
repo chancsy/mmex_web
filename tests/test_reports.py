@@ -244,6 +244,47 @@ class ReportPageTests(QueueTestsBase):
                     '/reports/accounts?by=week', '/reports/categories?year=26'):
             self.assertEqual(self.client.get(bad).status_code, 400, bad)
 
+    def test_charts(self):
+        import json, re
+        from web import reports as web_reports
+        page = self.client.get('/settings').text
+        # Chart lines: named ones kept (max 5), unnamed dropped, unknown accounts ignored.
+        self.client.post('/settings', data={'csrf_token': csrf(page),
+                                            'line_0_name': 'Bank + Cash', 'line_0_add_to': 'none',
+                                            'line_0_accounts': [str(BANK), str(CASH), '999'],
+                                            'line_1_name': 'Liquid + Cash', 'line_1_add_to': 'liquid',
+                                            'line_1_accounts': [str(CASH), str(BANK)],
+                                            'line_2_name': '', 'line_2_accounts': str(BANK)})
+        self.assertEqual(self.app.config['MMEX_STORE'].prefs()['chart_lines'],
+                         [{'name': 'Bank + Cash', 'add_to': 'none', 'accounts': sorted([BANK, CASH])},
+                          {'name': 'Liquid + Cash', 'add_to': 'liquid', 'accounts': sorted([BANK, CASH])}])
+        self.assertIn('2 extra lines: Bank + Cash, Liquid + Cash', self.client.get('/settings').text)
+        def chart(url):
+            text = self.client.get(url).text
+            return json.loads(re.search(r'<script type="application/json" class="chart-data">(.*?)</script>', text, re.S).group(1))
+        nw = chart('/reports/net-worth?end=2026-02&n=3')
+        self.assertEqual(nw['kind'], 'line')
+        self.assertEqual(nw['money']['decimals'], 2)
+        by = {s['name']: s for s in nw['series']}
+        self.assertEqual([by[k]['slot'] for k in ('Total', 'Liquid', 'Bank + Cash', 'Liquid + Cash')], [1, 2, 4, 5])
+        # Asset/loan default aside, Bank and Cash are both liquid: "Liquid + Cash" adds nothing twice.
+        self.assertEqual(by['Liquid + Cash']['values'], by['Liquid']['values'])
+        # The All range starts at the first month with data.
+        allr = chart('/reports/net-worth?end=2026-02&n=all')
+        with sqlite3.connect(self.db) as conn:
+            first = R.first_month(conn)
+        self.assertEqual(allr['x'][0], first)
+        self.assertEqual(self.client.get('/reports/income?n=all').status_code, 400, 'All is Net worth only')
+        inc = chart('/reports/income?end=2026-02&n=3')
+        self.assertEqual((inc['kind'], len(inc['bars']['values']), len(inc['line']['values'])), ('bars', 3, 3))
+        self.assertEqual(chart('/reports/accounts?by=year&n=3')['kind'], 'stack')
+        self.assertIn('class="spark"', self.client.get('/reports/categories?end=2026-02&n=3').text)
+        # Helpers: the rolling average only counts months with data; sparklines skip flat rows.
+        rows = [{'month': '2026-01', 'net': 10.0}, {'month': '2026-02', 'net': 20.0}]
+        self.assertEqual(web_reports._rolling(rows, ['2026-01', '2026-02'], '2026-01'), [10.0, 15.0])
+        self.assertIsNone(web_reports._spark_points([0, 0, 0]))
+        self.assertEqual(web_reports._spark_points({'a': 1.0}, ['a', 'b'])['zero'], 15)
+
     def test_settings(self):
         page = self.client.get('/settings').text
         self.assertIn('id="accounts"', page)

@@ -66,6 +66,11 @@ def shift(ym, n) -> str:
     return f'{i // 12:04d}-{i % 12 + 1:02d}'
 
 
+def months_between(a, b) -> int:
+    """How many months from a to b ('2026-01' to '2026-03' is 2)."""
+    return (int(b[:4]) - int(a[:4])) * 12 + int(b[5:7]) - int(a[5:7])
+
+
 def months(end, n) -> list:
     """The n months ending with `end`, oldest first."""
     return [shift(end, i) for i in range(1 - n, 1)]

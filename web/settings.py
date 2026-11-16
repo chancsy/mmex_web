@@ -11,7 +11,7 @@ from engine import rates, reports as report_engine
 from .auth import _safe_next, login_required
 from .pages import TYPE_LABELS, TYPE_ORDER, can_write, db
 from . import rates as rates_page
-from .store import PREF_DEFAULTS, report_config
+from .store import CHART_LINE_ADD_TO, CHART_LINE_MAX, PREF_DEFAULTS, report_config
 
 bp = Blueprint('settings', __name__)
 
@@ -33,7 +33,8 @@ def settings():
         store.set_prefs(favourites_first=bool(request.form.get('favourites_first')), hidden_accounts=ids('hidden'),
                         hide_balances=bool(request.form.get('hide_balances')), rate_keep_currencies=keep,
                         twin_notes=pattern, report_ignored_accounts=ids('ignored'),
-                        nonliquid_accounts=ids('nonliquid'), investment_accounts=ids('investment'))
+                        nonliquid_accounts=ids('nonliquid'), investment_accounts=ids('investment'),
+                        chart_lines=_chart_lines(request.form, known))
         flash('Settings saved.', 'info')
         if added and can_write():
             n, dates = rates_page.fill_from_saved(d.conn, rates_page._base_symbol(d.conn),
@@ -54,6 +55,20 @@ def settings():
                            currencies=curr, keep=set(prefs['rate_keep_currencies']), banners=d.banners)
 
 
+def _chart_lines(form, known) -> list:
+    """The Net worth chart's extra lines from the form's line_N_* fields;
+    a line without a name is dropped (that's how one is removed)."""
+    out = []
+    for i in range(CHART_LINE_MAX + 1):
+        name = form.get(f'line_{i}_name', '').strip()[:40]
+        if not name or len(out) == CHART_LINE_MAX:
+            continue
+        add_to = form.get(f'line_{i}_add_to', 'none')
+        accounts = sorted({int(v) for v in form.getlist(f'line_{i}_accounts') if v.isdigit() and int(v) in known})
+        out.append({'name': name, 'add_to': add_to if add_to in CHART_LINE_ADD_TO else 'none', 'accounts': accounts})
+    return out
+
+
 def _report_settings(d, prefs) -> dict:
     """The Accounts section: every account by type (closed ones apart) and
     the current report choices (hidden ones are in prefs)."""
@@ -67,7 +82,10 @@ def _report_settings(d, prefs) -> dict:
     rows = [{'closed': closed, 'label': TYPE_LABELS.get(t, t),
              'accounts': sorted(accts_, key=lambda a: a['name'].lower())}
             for (closed, t), accts_ in sorted(groups.items(), key=lambda kv: key(kv[0]))]
-    return {'groups': rows, 'cfg': cfg, 'defaulted': prefs['nonliquid_accounts'] is None}
+    lines = [dict(l, names=[accts[a]['name'] for a in l['accounts'] if a in accts]) for l in prefs['chart_lines']]
+    blank = [] if len(lines) >= CHART_LINE_MAX else [{'name': '', 'add_to': 'none', 'accounts': [], 'names': []}]
+    return {'groups': rows, 'cfg': cfg, 'defaulted': prefs['nonliquid_accounts'] is None,
+            'lines': lines + blank, 'add_to': CHART_LINE_ADD_TO, 'line_max': CHART_LINE_MAX}
 
 
 @bp.route('/settings/balances', methods=['POST'])

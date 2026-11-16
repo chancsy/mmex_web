@@ -92,7 +92,13 @@ PREF_DEFAULTS = {
     'report_ignored_accounts': [],     # a separate "wallet": left out of every report
     'nonliquid_accounts': None,        # in Total, not in Liquid
     'investment_accounts': [],         # in Investment (liquid or not)
+    # Extra lines on the Net worth chart: [{name, add_to, accounts}], the
+    # chosen accounts' balances added to nothing, Liquid or Total.
+    'chart_lines': [],
 }
+
+CHART_LINE_MAX = 5
+CHART_LINE_ADD_TO = {'none': 'Nothing', 'liquid': 'Liquid', 'total': 'Total'}
 
 NONLIQUID_TYPES = ('Asset', 'Loan')
 

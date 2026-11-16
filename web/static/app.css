@@ -434,3 +434,81 @@ table.rsettings td select { max-width: 14rem; font-size: .82rem; padding: .2rem 
   table.rsettings th, table.rsettings td { padding: .3rem .3rem; }
   table.rsettings td select { max-width: 7.5rem; }
 }
+
+/* Report charts (charts.js). Series colours by slot, validated as a set
+   for colour-blind separation on the card colour in each theme. Text never
+   wears a series colour; marks do. */
+:root {
+  --c1: #2a78d6; --c2: #eb6834; --c3: #1baf7a; --c4: #eda100;
+  --c5: #e87ba4; --c6: #008300; --c7: #6250d6; --c8: #e34948;
+  --chart-grid: #eceef2; --chart-axis: #c3c7cf;
+}
+:root[data-theme=dark] {
+  --c1: #3987e5; --c2: #d95926; --c3: #199e70; --c4: #c98500;
+  --c5: #d55181; --c6: #008300; --c7: #9085e9; --c8: #e66767;
+  --chart-grid: #252c35; --chart-axis: #3a424d;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme=light]) {
+    --c1: #3987e5; --c2: #d95926; --c3: #199e70; --c4: #c98500;
+    --c5: #d55181; --c6: #008300; --c7: #9085e9; --c8: #e66767;
+    --chart-grid: #252c35; --chart-axis: #3a424d;
+  }
+}
+figure.chart { position: relative; margin: 0 0 .9rem; outline-offset: 2px; }
+figure.chart svg { display: block; overflow: visible; touch-action: pan-y; }
+.chart .grid { stroke: var(--chart-grid); stroke-width: 1; }
+.chart .base { stroke: var(--chart-axis); stroke-width: 1; }
+.chart .tick { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.chart .tick.name { fill: var(--text); font-size: 12px; font-variant-numeric: normal; }
+.chart .tick.value { fill: var(--text); }
+.chart .endlabel { fill: var(--text); font-size: 12px; }
+.chart .ln { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart .ln.avg { stroke: var(--text); }
+.chart .cross { stroke: var(--muted); stroke-width: 1; }
+.chart .bandhl { fill: var(--text); opacity: .06; }
+.chart .hit { fill: transparent; cursor: crosshair; }
+.chart .dot, .chart .netdot { stroke: var(--card); stroke-width: 2; }
+.chart .netdot { fill: var(--text); }
+.chart .bar.pos { fill: var(--c1); }
+.chart .bar.neg { fill: var(--c8); }
+.chart .ln.k1 { stroke: var(--c1); } .chart .k1.bar, .chart .k1.dot { fill: var(--c1); }
+.chart .ln.k2 { stroke: var(--c2); } .chart .k2.bar, .chart .k2.dot { fill: var(--c2); }
+.chart .ln.k3 { stroke: var(--c3); } .chart .k3.bar, .chart .k3.dot { fill: var(--c3); }
+.chart .ln.k4 { stroke: var(--c4); } .chart .k4.bar, .chart .k4.dot { fill: var(--c4); }
+.chart .ln.k5 { stroke: var(--c5); } .chart .k5.bar, .chart .k5.dot { fill: var(--c5); }
+.chart .ln.k6 { stroke: var(--c6); } .chart .k6.bar, .chart .k6.dot { fill: var(--c6); }
+.chart .ln.k7 { stroke: var(--c7); } .chart .k7.bar, .chart .k7.dot { fill: var(--c7); }
+.chart .ln.k8 { stroke: var(--c8); } .chart .k8.bar, .chart .k8.dot { fill: var(--c8); }
+/* Legend and read-out keys: a short line for lines, a small box for bars. */
+.chart-legend { display: flex; flex-wrap: wrap; gap: .2rem .9rem; margin-bottom: .5rem; font-size: .82rem; }
+.chart-legend .legend-item { display: inline-flex; align-items: center; gap: .4rem; color: var(--text); }
+.chart-legend button.legend-item { background: none; border: 0; padding: .15rem 0; font: inherit; cursor: pointer; }
+.chart-legend button.legend-item.off { color: var(--muted); text-decoration: line-through; }
+.chart-legend button.legend-item.off .key { opacity: .3; }
+.key { display: inline-block; flex: none; }
+.key.line { width: 14px; height: 2px; border-radius: 1px; }
+.key.box { width: 10px; height: 10px; border-radius: 2px; }
+.key.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text); }
+.key.none { width: 14px; }
+.key.k1 { background: var(--c1); } .key.k2 { background: var(--c2); } .key.k3 { background: var(--c3); } .key.k4 { background: var(--c4); }
+.key.k5 { background: var(--c5); } .key.k6 { background: var(--c6); } .key.k7 { background: var(--c7); } .key.k8 { background: var(--c8); }
+.key.pos { background: var(--c1); } .key.neg { background: var(--c8); } .key.avg { background: var(--text); }
+.key.split { background: linear-gradient(90deg, var(--c1) 50%, var(--c8) 50%); }
+.chart-tip { position: absolute; z-index: 3; pointer-events: none; min-width: 9rem; max-width: 16rem; padding: .45rem .6rem;
+  background: var(--card); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,.12); font-size: .8rem; }
+.chart-tip .tip-title { color: var(--muted); margin-bottom: .2rem; }
+.chart-tip .tip-row { display: flex; align-items: center; gap: .45rem; white-space: nowrap; }
+.chart-tip .tip-row strong { font-variant-numeric: tabular-nums; }
+/* Sparklines in table rows */
+td.sparkcell { padding-top: 0; padding-bottom: 0; }
+svg.spark { width: 60px; height: 16px; display: block; }
+svg.spark polyline { fill: none; stroke: var(--c1); stroke-width: 1.5; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+svg.spark .zero { stroke: var(--chart-axis); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* Settings: Net worth chart lines */
+fieldset.chartline { border: 1px solid var(--line); border-radius: 8px; margin: .6rem 0 0; padding: .4rem .8rem .5rem; }
+fieldset.chartline legend { font-size: .8rem; color: var(--muted); padding: 0 .3rem; }
+.chartline-row { display: flex; flex-wrap: wrap; gap: .4rem 1rem; margin-bottom: .4rem; }
+.chartline-row label { flex: 1 1 12rem; }
+.chartline-row input, .chartline-row select { display: block; width: 100%; margin-top: .2rem; }

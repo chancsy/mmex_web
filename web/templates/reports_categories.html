@@ -1,8 +1,8 @@
 {% extends 'base.html' %}
-{% from '_reports.html' import tabs, delta, span_form %}
+{% from '_reports.html' import tabs, delta, span_form, chart_figure, spark %}
 {% block title %}By category · Reports · MMEX Web UI{% endblock %}
 {% macro cells(node) %}
-{% for ym in months %}{% set v = node.months.get(ym, 0) %}<td class="num {{ 'neg' if v < -0.005 else 'pos' if v > 0.005 }}">{{ v | money(base) if v | abs > 0.005 else '' }}</td>{% endfor %}
+<td class="sparkcell">{{ spark(node.months | spark_points(months)) }}</td>{% for ym in months %}{% set v = node.months.get(ym, 0) %}<td class="num {{ 'neg' if v < -0.005 else 'pos' if v > 0.005 }}">{{ v | money(base) if v | abs > 0.005 else '' }}</td>{% endfor %}
 <td class="num strong">{{ delta(node.total, base, hide=False) }}</td><td class="num">{{ (node.total / months | length) | money(base) }}</td>
 {% endmacro %}
 {% block content %}
@@ -10,16 +10,17 @@
   <span class="tools small"><button type="button" class="link" data-expand-all hidden>Expand all</button></span></div>
 {{ tabs(pages, 'reports.categories') }}
 {{ span_form(span, years, 'reports.categories') }}
+{{ chart_figure(chart, 'Spending by category over the range, largest first') }}
 <div class="tablewrap"><table class="report wide" data-groups data-start-shut>
-  <thead><tr><th>Category</th>{% for ym in months %}<th>{{ ym | ym }}</th>{% endfor %}<th>Total</th><th>Average</th></tr></thead>
+  <thead><tr><th>Category</th><th><span class="visually-hidden">Trend</span></th>{% for ym in months %}<th>{{ ym | ym }}</th>{% endfor %}<th>Total</th><th>Average</th></tr></thead>
   {% for t in tops %}
   <tbody class="grp">
     <tr class="gh"><th scope="rowgroup">{% if t.children %}<button type="button" class="link gtoggle" aria-expanded="true">{{ t.name }}</button>{% else %}<span class="gname">{{ t.name }}</span>{% endif %}</th>{{ cells(t) }}</tr>
     {% for k in t.children %}<tr class="sub"><th scope="row">{{ k.name }}</th>{{ cells(k) }}</tr>{% endfor %}
   </tbody>
   {% endfor %}
-  <tfoot><tr><th scope="row">Net</th>{% for ym in months %}<td class="num">{{ delta(total[ym], base, hide=False) }}</td>{% endfor %}
+  <tfoot><tr><th scope="row">Net</th><td></td>{% for ym in months %}<td class="num">{{ delta(total[ym], base, hide=False) }}</td>{% endfor %}
     {% set all = total.values() | sum %}<td class="num strong">{{ delta(all, base, hide=False) }}</td><td class="num">{{ (all / months | length) | money(base) }}</td></tr></tfoot>
 </table></div>
-<p class="small muted">Signed: income is positive, spending negative, in {{ base.symbol if base else 'the base currency' }} at the rate on each row's date. Tap a category to show its subcategories. Transfers and ignored accounts are left out.</p>
+<p class="small muted">Signed: income is positive, spending negative, in {{ base.symbol if base else 'the base currency' }} at the rate on each row's date. Tap a category to show its subcategories; the small line beside each is its trend over the range. The chart is spending only (categories that are negative overall). Transfers and ignored accounts are left out.</p>
 {% endblock %}

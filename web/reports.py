@@ -39,11 +39,13 @@ def _month_arg(name, default):
     return min(value, _this_month())
 
 
-def _span():
+def _span(first=None):
     """(end month, number of months, range info for the template). ?year=Y
-    picks that calendar year (to this month, for the current year)."""
+    picks that calendar year (to this month, for the current year). With
+    first (the first month with data), n=all is allowed: from that month."""
     current = _this_month()
     year = request.args.get('year', '').strip()
+    shown_n = None
     if year:
         if not (year.isdigit() and len(year) == 4):
             abort(400, 'year must be YYYY')
@@ -51,13 +53,18 @@ def _span():
         n = int(end[5:7]) if end[:4] == year else 12
     else:
         end = _month_arg('end', R.shift(current, -1))
-        try:
-            n = int(request.args.get('n', '12'))
-        except ValueError:
-            abort(400, 'n must be a number')
-        if n not in SPANS:
-            abort(400, f'n must be one of {", ".join(map(str, SPANS))}')
-    return end, n, {'end': end, 'n': n, 'year': year, 'current': current, 'spans': SPANS}
+        raw = request.args.get('n', '12')
+        if first and raw == 'all':
+            n, shown_n = max(1, R.months_between(first, end) + 1), 'all'
+        else:
+            try:
+                n = int(raw)
+            except ValueError:
+                abort(400, 'n must be a number')
+            if n not in SPANS:
+                abort(400, f'n must be one of {", ".join(map(str, SPANS))}')
+    spans = SPANS + (('all',) if first else ())
+    return end, n, {'end': end, 'n': shown_n or n, 'year': year, 'current': current, 'spans': spans}
 
 
 def _by():
@@ -93,7 +100,45 @@ def _type_key(t):
 
 def _common(d, **kw):
     base = d.currencies.get(R.Rates(d.conn).base)
+    if kw.get('chart'):
+        # How charts.js formats amounts: the base currency's prefix, suffix and decimals.
+        b = base or {'prefix': '', 'suffix': '', 'decimals': 2}
+        kw['chart'] = dict(kw['chart'], money={k: b[k] for k in ('prefix', 'suffix', 'decimals')})
     return dict(kw, base=base, currencies=d.currencies, banners=d.banners, pages=PAGES, years=_years(d))
+
+
+# -- charts: the data charts.js draws (see the <figure class="chart"> on each page)
+
+def _net_worth_chart(snap, monthly, lines) -> dict:
+    """Total, Liquid, Investment (when any) and the Settings page's extra
+    lines, one point per month-end. An extra line adds its accounts'
+    balances to nothing, Liquid or Total, skipping any already in it.
+    Each series keeps its colour slot whichever others are drawn."""
+    accts = snap['accounts']
+    series = [{'name': 'Total', 'slot': 1, 'values': [r['total'] for r in monthly]},
+              {'name': 'Liquid', 'slot': 2, 'values': [r['liquid'] for r in monthly]}]
+    if any(abs(r['investment']) > 0.005 for r in monthly):
+        series.append({'name': 'Investment', 'slot': 3, 'values': [r['investment'] for r in monthly]})
+    for i, line in enumerate(lines):
+        add_to = line['add_to']
+        def counted(a):
+            return not a['ignored'] and (add_to == 'total' or (add_to == 'liquid' and a['liquid']))
+        mine = [accts[a] for a in line['accounts'] if a in accts and not counted(accts[a])]
+        values = [sum(a['base'][r['month']] for a in mine) + (r[add_to] if add_to in ('liquid', 'total') else 0.0)
+                  for r in monthly]
+        series.append({'name': line['name'], 'slot': 4 + i, 'values': values})
+    return {'kind': 'line', 'secret': True, 'x': [r['month'] for r in monthly], 'series': series}
+
+
+def _rolling(rows, months, first, size=12) -> list:
+    """Each month's average net over the `size` months ending with it,
+    counting only months from `first` (the first with data) on."""
+    net = {r['month']: r['net'] for r in rows}
+    out = []
+    for ym in months:
+        window = [net.get(m, 0.0) for m in R.months(ym, size) if m >= first]
+        out.append(sum(window) / len(window) if window else 0.0)
+    return out
 
 
 @bp.app_template_filter('ym')
@@ -103,6 +148,22 @@ def _ym(value):
         return datetime.date(int(value[:4]), int(value[5:7]), 1).strftime('%b %y')
     except (TypeError, ValueError):
         return value
+
+
+@bp.app_template_filter('spark_points')
+def _spark_points(values, keys=None):
+    """A sparkline's polyline points in a 60x16 box, and where zero sits;
+    values may be a {key: value} dict read in `keys` order (missing = 0).
+    None when there's nothing to draw."""
+    if keys is not None:
+        values = [values.get(k, 0.0) for k in keys]
+    if len(values) < 2 or all(abs(v) < 0.005 for v in values):
+        return None
+    lo, hi = min(min(values), 0.0), max(max(values), 0.0)
+    def y(v):
+        return round(15 - (v - lo) / (hi - lo) * 14, 2)
+    step = 60 / (len(values) - 1)
+    return {'points': ' '.join(f'{round(i * step, 2)},{y(v)}' for i, v in enumerate(values)), 'zero': y(0.0)}
 
 
 @bp.route('/')
@@ -158,15 +219,18 @@ def net_worth():
     if _by() == 'year':
         cols, last, span = _year_span()
         # Every month from the December before the first year, so each
-        # year's changes are its months' changes added up.
-        first = f'{int(cols[0]) - 1}-12'
-        count = (int(last[:4]) - int(first[:4])) * 12 + int(last[5:]) - int(first[5:]) + 1
-        rows = R.by_year(R.net_worth(R.snapshot(d.conn, R.months(last, count), config(d))))
+        # year's changes are its months' changes added up (and the chart
+        # still draws every month-end).
+        month_list = R.months(last, R.months_between(f'{int(cols[0]) - 1}-12', last) + 1)
     else:
-        end, n, span = _span()
+        end, n, span = _span(first=R.first_month(d.conn))
         span['by'] = 'month'
-        rows = R.net_worth(R.snapshot(d.conn, R.months(end, n + 1), config(d)))
-    return render_template('reports_net_worth.html', rows=rows, span=span, **_common(d))
+        month_list = R.months(end, n + 1)
+    snap = R.snapshot(d.conn, month_list, config(d))
+    monthly = R.net_worth(snap)
+    rows = R.by_year(monthly) if span['by'] == 'year' else monthly
+    chart = _net_worth_chart(snap, monthly, current_app.config['MMEX_STORE'].prefs()['chart_lines'])
+    return render_template('reports_net_worth.html', rows=rows, span=span, **_common(d, chart=chart))
 
 
 def _lines(d, month_list):
@@ -180,11 +244,20 @@ def income():
     d = db()
     end, n, span = _span()
     ms = R.months(end, n)
-    rows = R.income_expense(_lines(d, ms), ms)
+    wide = R.months(end, n + 11)          # 11 months more, for the first months' 12-month average
+    lines = _lines(d, wide)
+    rows = R.income_expense(lines, ms)
     total = {k: sum(r[k] for r in rows) for k in ('income', 'expenses', 'net')}
     total['rate'] = total['net'] / total['income'] if total['income'] > 0.005 else None
     average = {k: total[k] / len(rows) for k in ('income', 'expenses', 'net')}
-    return render_template('reports_income.html', rows=rows, total=total, average=average, span=span, **_common(d))
+    chart = {'kind': 'bars', 'secret': False, 'x': ms,
+             'bars': {'name': 'Net saved', 'values': [r['net'] for r in rows]},
+             'line': {'name': '12-month average', 'values': _rolling(R.income_expense(lines, wide), ms,
+                                                                     R.first_month(d.conn) or ms[0])},
+             'extra': [{'name': 'Income', 'values': [r['income'] for r in rows]},
+                       {'name': 'Expenses', 'values': [r['expenses'] for r in rows]}]}
+    return render_template('reports_income.html', rows=rows, total=total, average=average, span=span,
+                           **_common(d, chart=chart))
 
 
 @bp.route('/categories')
@@ -195,7 +268,15 @@ def categories():
     ms = R.months(end, n)
     tops = R.by_category(_lines(d, ms), ms)
     total = {ym: sum(t['months'].get(ym, 0.0) for t in tops) for ym in ms}
-    return render_template('reports_categories.html', tops=tops, months=ms, total=total, span=span, **_common(d))
+    # Spending by top-level category over the range, largest first; past
+    # ten, the rest fold into "Other".
+    spend = sorted(({'name': t['name'], 'value': -t['total']} for t in tops if t['total'] < -0.005),
+                   key=lambda x: -x['value'])
+    if len(spend) > 10:
+        spend = spend[:9] + [{'name': f'Other ({len(spend) - 9})', 'value': sum(x['value'] for x in spend[9:])}]
+    chart = {'kind': 'hbar', 'secret': False, 'name': 'Spending', 'items': spend} if spend else None
+    return render_template('reports_categories.html', tops=tops, months=ms, total=total, span=span,
+                           **_common(d, chart=chart))
 
 
 @bp.route('/accounts')
@@ -230,5 +311,9 @@ def account_changes():
     for g in ordered:
         g['rows'].sort(key=lambda r: r['name'].lower())
     total = [sum(g['changes'][i] for g in ordered) for i in range(len(cols))]
+    # Each type keeps one colour (its place in TYPE_ORDER), whichever types show.
+    chart = {'kind': 'stack', 'secret': True, 'x': cols, 'net': total, 'net_name': 'Net change',
+             'series': [{'name': g['label'], 'slot': min(_type_key(g['type'])[0] + 1, 8), 'values': g['changes']}
+                        for g in ordered]}
     return render_template('reports_accounts.html', groups=ordered, cols=cols, total=total, span=span,
-                           end_total=sum(g['end'] for g in ordered), **_common(d))
+                           end_total=sum(g['end'] for g in ordered), **_common(d, chart=chart))

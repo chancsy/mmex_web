@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% from '_reports.html' import tabs, delta, span_form %}
+{% from '_reports.html' import tabs, delta, span_form, chart_figure %}
 {% block title %}Net worth · Reports · MMEX Web UI{% endblock %}
 {% block content %}
 <div class="heading"><h1>Net worth</h1></div>
@@ -22,6 +22,7 @@
     <span class="num small">{{ delta(rows | sum(attribute='d_' ~ key), base) }} over {{ rows | length }} {{ unit }}{{ '' if rows | length == 1 else 's' }}</span></div>
   {% endfor %}
 </section>
+{{ chart_figure(chart, 'Net worth by month-end: Total, Liquid, Investment and any extra lines') }}
 <div class="tablewrap"><table class="report">
   <thead><tr><th>{{ 'Year' if unit == 'year' else 'Month' }}</th><th>Total</th><th>Change</th><th>Liquid</th><th>Change</th>{% if inv %}<th>Investment</th><th title="Without money moved into or out of investment accounts">Change</th>{% endif %}<th title="The part of Total's change that came only from exchange-rate moves on foreign-currency balances">From rates</th></tr></thead>
   <tbody>
@@ -35,5 +36,5 @@
   </tbody>
 </table></div>
 {% endif %}
-<p class="small muted">Total counts every account except ignored ones; Liquid leaves out the ones marked not liquid; Investment is the ones marked investment, liquid or not; its Change leaves out money moved into or out of those accounts, so it's what rates and real transactions did. Each month at its month-end rates.{% if unit == 'year' %} A year's figures are at its December (the current year: the last full month); its changes are its months' changes added up, so Total's and Liquid's are December to December.{% endif %} "From rates" is how much of Total's change came only from exchange-rate moves on foreign-currency balances. Choose accounts in <a href="{{ url_for('settings.settings', _anchor='accounts') }}">Settings</a>.</p>
+<p class="small muted">Total counts every account except ignored ones; Liquid leaves out the ones marked not liquid; Investment is the ones marked investment, liquid or not; its Change leaves out money moved into or out of those accounts, so it's what rates and real transactions did. Each month at its month-end rates.{% if unit == 'year' %} A year's figures are at its December (the current year: the last full month); its changes are its months' changes added up, so Total's and Liquid's are December to December.{% endif %} "From rates" is how much of Total's change came only from exchange-rate moves on foreign-currency balances. Choose accounts in <a href="{{ url_for('settings.settings', _anchor='accounts') }}">Settings</a>, and add chart lines (e.g. Liquid + EPF) <a href="{{ url_for('settings.settings', _anchor='chart-lines') }}">there too</a>. Tap a name above the chart to hide or show its line.</p>
 {% endblock %}

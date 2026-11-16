@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% from '_reports.html' import tabs, delta, span_form %}
+{% from '_reports.html' import tabs, delta, span_form, chart_figure %}
 {% block title %}Account changes · Reports · MMEX Web UI{% endblock %}
 {% block content %}
 <div class="heading"><h1>Account changes</h1>
@@ -13,6 +13,7 @@
 {% else %}
 {{ span_form(span, years, 'reports.account_changes', {'by': 'month'}) }}
 {% endif %}
+{{ chart_figure(chart, 'Change per account type, gains above zero and losses below, with the net change') }}
 <div class="tablewrap"><table class="report wide" data-groups data-start-shut>
   <thead><tr><th>Account type</th>{% for c in cols %}<th>{{ c | ym if span.by == 'month' else c }}</th>{% endfor %}<th>Balance {{ span.end if span.by == 'year' else cols[-1] }}</th></tr></thead>
   {% for g in groups %}
@@ -25,5 +26,5 @@
   {% endfor %}
   <tfoot><tr><th scope="row">Total</th>{% for v in total %}<td class="num">{{ delta(v, base) }}</td>{% endfor %}<td class="num strong">{{ end_total | secret(base) }}</td></tr></tfoot>
 </table></div>
-<p class="small muted">Each cell is how much the type's balance changed over that {{ span.by }}{% if span.by == 'year' %} (December to December; the current year to the last full month){% endif %}, in {{ base.symbol if base else 'the base currency' }} at month-end rates, so it includes exchange-rate moves. Ignored accounts are left out. Tap a type to show its accounts.</p>
+<p class="small muted">Each cell is how much the type's balance changed over that {{ span.by }}{% if span.by == 'year' %} (December to December; the current year to the last full month){% endif %}, in {{ base.symbol if base else 'the base currency' }} at month-end rates, so it includes exchange-rate moves. Ignored accounts are left out. Tap a type to show its accounts. In the chart, each type's gain stacks above zero and its loss below; the dot is the net change.</p>
 {% endblock %}
