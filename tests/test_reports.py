@@ -236,17 +236,19 @@ class ReportPageTests(QueueTestsBase):
 
     def test_settings(self):
         page = self.client.get('/settings').text
-        self.assertIn('id="reports"', page)
-        self.assertIn('Not saved yet', page)
+        self.assertIn('id="accounts"', page)
+        self.assertIn('Reports not set up yet', page)
         # Both investment and not liquid: allowed.
-        self.client.post('/settings/reports', data={'csrf_token': csrf(page), 'nonliquid': str(BANK), 'investment': str(BANK)})
+        self.client.post('/settings', data={'csrf_token': csrf(page), 'nonliquid': str(BANK), 'investment': str(BANK)})
         prefs = self.app.config['MMEX_STORE'].prefs()
         self.assertEqual((prefs['nonliquid_accounts'], prefs['investment_accounts']), ([BANK], [BANK]))
-        self.client.post('/settings/reports', data={'csrf_token': csrf(page), 'ignored': str(CASH_USD),
-                                                    'nonliquid': str(CASH), 'investment': str(BANK)})
+        # One Save covers hidden accounts and the report flags together.
+        self.client.post('/settings', data={'csrf_token': csrf(page), 'ignored': str(CASH_USD), 'hidden': str(CASH),
+                                            'nonliquid': str(CASH), 'investment': str(BANK)})
         prefs = self.app.config['MMEX_STORE'].prefs()
-        self.assertEqual((prefs['report_ignored_accounts'], prefs['nonliquid_accounts'], prefs['investment_accounts']),
-                         ([CASH_USD], [CASH], [BANK]))
+        self.assertEqual((prefs['report_ignored_accounts'], prefs['nonliquid_accounts'], prefs['investment_accounts'],
+                          prefs['hidden_accounts']), ([CASH_USD], [CASH], [BANK], [CASH]))
+        self.assertIn('1 hidden · 1 ignored · 1 not liquid · 1 investment', self.client.get('/settings').text)
         page = self.client.get('/reports/month-end?month=2026-02').text
         self.assertIn('Ignored (not in totals)', page)
         self.assertIn('>not liquid</span>', page)

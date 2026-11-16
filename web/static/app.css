@@ -264,9 +264,9 @@ details.others > summary .glabel { font-weight: 500; font-size: .9rem; }
 details.others .accounts { opacity: .85; }
 
 /* settings */
+form.settings label.stack input { display: block; width: 100%; margin: .3rem 0 .25rem; }
+form.settings label.stack .small { display: block; }
 form.settings label.check { display: flex; flex-direction: row; align-items: center; gap: .5rem; color: var(--text); font-size: .95rem; padding: .25rem 0; }
-.hidepick { margin-top: .6rem; display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 0 1rem; }
-.hidepick legend { font-weight: 650; color: var(--muted); font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; }
 
 /* the eye: hide balances */
 .brandline { display: inline-flex; align-items: center; gap: .4rem; }
@@ -417,6 +417,10 @@ button.gtoggle { color: var(--text); font-weight: 650; text-align: left; }
 button.gtoggle::before { content: '▾'; display: inline-block; width: 1em; color: var(--muted); }
 button.gtoggle[aria-expanded="false"]::before { content: '▸'; }
 table.rsettings td { text-align: center; }
+table.rsettings thead th { text-align: center; }
+table.rsettings thead th:first-child { text-align: left; vertical-align: bottom; }
+table.rsettings tr.bands th { padding-bottom: 0; font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; font-weight: 650; }
+table.rsettings .band { border-right: 1px solid var(--line); }
 table.rsettings td select { max-width: 14rem; font-size: .82rem; padding: .2rem .3rem; }
 .rby { margin: 0 0 .6rem; }
 @media (max-width: 640px) {

@@ -9,5 +9,5 @@
   <li><a href="{{ url_for(ep) }}">{{ label }}</a><span class="small muted">{{ text }}</span></li>
   {% endfor %}
 </ul>
-<p class="small muted">Amounts are in {{ base.symbol if base else 'the base currency' }}: balances at each month-end's rate, income and expenses at the rate on their own date (MMEX's currency history). Transfers and rows linked to an MMEX asset never count as income or expenses. An asset account's value includes the MMEX assets it holds. Choose ignored, not-liquid and investment accounts in <a href="{{ url_for('settings.settings', _anchor='reports') }}">Settings</a>.</p>
+<p class="small muted">Amounts are in {{ base.symbol if base else 'the base currency' }}: balances at each month-end's rate, income and expenses at the rate on their own date (MMEX's currency history). Transfers and rows linked to an MMEX asset never count as income or expenses. An asset account's value includes the MMEX assets it holds. Choose ignored, not-liquid and investment accounts in <a href="{{ url_for('settings.settings', _anchor='accounts') }}">Settings</a>.</p>
 {% endblock %}

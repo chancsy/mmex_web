@@ -6,7 +6,7 @@ tables (no xe.com visits)."""
 
 from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, url_for
 
-from engine import rates, reports as report_engine, views
+from engine import rates, reports as report_engine
 
 from .auth import _safe_next, login_required
 from .pages import TYPE_LABELS, TYPE_ORDER, can_write, db
@@ -23,14 +23,17 @@ def settings():
     d = db()
     if request.method == 'POST':
         known = set(d.ref.accounts)
-        hidden = sorted({int(v) for v in request.form.getlist('hidden') if v.isdigit() and int(v) in known})
+        def ids(name):
+            return sorted({int(v) for v in request.form.getlist(name) if v.isdigit() and int(v) in known})
         known_curr = {c['id'] for c in rates.all_currencies(d.conn)}
         keep = sorted({int(v) for v in request.form.getlist('keep_currency') if v.isdigit() and int(v) in known_curr})
         added = set(keep) - set(store.prefs()['rate_keep_currencies'])
         pattern = request.form.get('twin_notes', '').strip() or PREF_DEFAULTS['twin_notes']
-        store.set_prefs(favourites_first=bool(request.form.get('favourites_first')), hidden_accounts=hidden,
+        # An account can be both investment and not liquid (Investment isn't part of Liquid).
+        store.set_prefs(favourites_first=bool(request.form.get('favourites_first')), hidden_accounts=ids('hidden'),
                         hide_balances=bool(request.form.get('hide_balances')), rate_keep_currencies=keep,
-                        twin_notes=pattern)
+                        twin_notes=pattern, report_ignored_accounts=ids('ignored'),
+                        nonliquid_accounts=ids('nonliquid'), investment_accounts=ids('investment'))
         flash('Settings saved.', 'info')
         if added and can_write():
             n, dates = rates_page.fill_from_saved(d.conn, rates_page._base_symbol(d.conn),
@@ -39,10 +42,6 @@ def settings():
                   if n else 'No saved xe.com tables to fill the newly kept currencies from yet; Download fills them.', 'info')
         return redirect(url_for('settings.settings'))
     prefs = store.prefs()
-    groups = {}
-    for a in views.accounts(d.conn, d.ref, include_closed=False):
-        groups.setdefault(a['type'] or 'Other', []).append(a)
-    ordered = sorted(groups.items(), key=lambda kv: (TYPE_ORDER.index(kv[0]) if kv[0] in TYPE_ORDER else len(TYPE_ORDER), kv[0]))
     base = rates_page._base_symbol(d.conn)
     saved = store.xe_dates(base) if base else {}
     on_xe = set(store.xe_table(base, max(saved))['rates']) if saved else None
@@ -52,14 +51,12 @@ def settings():
     return render_template('settings.html', prefs=prefs, hidden=set(prefs['hidden_accounts']), base=base,
                            report=_report_settings(d, prefs),
                            default_pattern=PREF_DEFAULTS['twin_notes'],
-                           currencies=curr, keep=set(prefs['rate_keep_currencies']),
-                           groups=[(TYPE_LABELS.get(t, t), sorted(a, key=lambda x: x['name'].lower())) for t, a in ordered],
-                           banners=d.banners)
+                           currencies=curr, keep=set(prefs['rate_keep_currencies']), banners=d.banners)
 
 
 def _report_settings(d, prefs) -> dict:
-    """The Reports section: every account by type (closed ones apart), the
-    current choices."""
+    """The Accounts section: every account by type (closed ones apart) and
+    the current report choices (hidden ones are in prefs)."""
     accts = report_engine.accounts(d.conn)
     cfg = report_config(prefs, {a['id']: a['type'] for a in accts.values()})
     groups = {}
@@ -71,22 +68,6 @@ def _report_settings(d, prefs) -> dict:
              'accounts': sorted(accts_, key=lambda a: a['name'].lower())}
             for (closed, t), accts_ in sorted(groups.items(), key=lambda kv: key(kv[0]))]
     return {'groups': rows, 'cfg': cfg, 'defaulted': prefs['nonliquid_accounts'] is None}
-
-
-@bp.route('/settings/reports', methods=['POST'])
-@login_required
-def report_settings():
-    """Ignored, not liquid and investment accounts. An account can be
-    both investment and not liquid (Investment isn't part of Liquid)."""
-    d = db()
-    known = set(d.ref.accounts)
-    def ids(name):
-        return sorted({int(v) for v in request.form.getlist(name) if v.isdigit() and int(v) in known})
-    ignored, nonliquid, investment = ids('ignored'), ids('nonliquid'), ids('investment')
-    current_app.config['MMEX_STORE'].set_prefs(report_ignored_accounts=ignored, nonliquid_accounts=nonliquid,
-                                               investment_accounts=investment)
-    flash('Report settings saved.', 'info')
-    return redirect(url_for('settings.settings', _anchor='reports'))
 
 
 @bp.route('/settings/balances', methods=['POST'])
