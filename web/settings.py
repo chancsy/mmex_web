@@ -76,19 +76,13 @@ def _report_settings(d, prefs) -> dict:
 @bp.route('/settings/reports', methods=['POST'])
 @login_required
 def report_settings():
-    """Ignored, not liquid and investment accounts. Investment
-    is part of Liquid, so an account can't be both investment and not
-    liquid; such a save is refused whole."""
+    """Ignored, not liquid and investment accounts. An account can be
+    both investment and not liquid (Investment isn't part of Liquid)."""
     d = db()
     known = set(d.ref.accounts)
     def ids(name):
         return sorted({int(v) for v in request.form.getlist(name) if v.isdigit() and int(v) in known})
     ignored, nonliquid, investment = ids('ignored'), ids('nonliquid'), ids('investment')
-    both = set(nonliquid) & set(investment)
-    if both:
-        names = ', '.join(sorted(d.ref.accounts[a]['name'] for a in both))
-        flash(f'Not saved: investment accounts must be liquid ({names} is ticked as both).', 'error')
-        return redirect(url_for('settings.settings', _anchor='reports'))
     current_app.config['MMEX_STORE'].set_prefs(report_ignored_accounts=ignored, nonliquid_accounts=nonliquid,
                                                investment_accounts=investment)
     flash('Report settings saved.', 'info')

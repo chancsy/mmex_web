@@ -36,7 +36,7 @@ Rules:
 - Config (all sets of account ids):
     ignored     left out of everything (a separate "wallet")
     nonliquid   in Total, not in Liquid
-    investment  in Investment (a subset of Liquid)
+    investment  in Investment (liquid or not)
 """
 
 import bisect
@@ -301,7 +301,7 @@ def snapshot(conn, month_list, config) -> dict:
             own[ym] = round(value, 2)
             base[ym] = value * rate[ym]
         a.update(own=own, base=base, rate=rate, cash=bal[aid], ignored=aid in ignored, liquid=aid not in nonliquid,
-                 investment=aid in investment and aid not in nonliquid, assets=mine)
+                 investment=aid in investment, assets=mine)
     linked = {x['id'] for xs in held.values() for x in xs}
     members = {aid for aid, a in accts.items() if a['investment'] and not a['ignored']}
     return {'accounts': accts, 'months': list(month_list), 'base': rates.base,

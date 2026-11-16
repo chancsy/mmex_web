@@ -91,7 +91,7 @@ PREF_DEFAULTS = {
     # and Loan accounts count as not liquid until the Settings page is saved.
     'report_ignored_accounts': [],     # a separate "wallet": left out of every report
     'nonliquid_accounts': None,        # in Total, not in Liquid
-    'investment_accounts': [],         # in Investment (must be liquid)
+    'investment_accounts': [],         # in Investment (liquid or not)
 }
 
 NONLIQUID_TYPES = ('Asset', 'Loan')

@@ -140,11 +140,12 @@ class EngineTests(unittest.TestCase):
         self.assertAlmostEqual(jan['d_investment'], (3.21 - 20.5) * 1.1)
         self.assertEqual(feb['moved_investment'], 0)
         self.assertAlmostEqual(feb['d_investment'], BANK_JAN * 0.1)
-        # Ignored accounts leave every figure; investment needs liquid.
+        # Ignored accounts leave every figure; an investment can be not liquid.
         snap = R.snapshot(self.conn, ['2026-01', '2026-02'], {'ignored': {BANK}, 'investment': {CASH}, 'nonliquid': {CASH}})
         row = R.net_worth(snap)[0]
         self.assertAlmostEqual(row['total'], 70 * 1.2)
-        self.assertEqual(row['investment'], 0)
+        self.assertEqual(row['liquid'], 0)
+        self.assertAlmostEqual(row['investment'], 70 * 1.2)
 
     def test_asset_values(self):
         setup_assets(self.path)
@@ -237,11 +238,10 @@ class ReportPageTests(QueueTestsBase):
         page = self.client.get('/settings').text
         self.assertIn('id="reports"', page)
         self.assertIn('Not saved yet', page)
-        # Both investment and not liquid: refused, nothing saved.
-        r = self.client.post('/settings/reports', data={'csrf_token': csrf(page), 'nonliquid': str(BANK),
-                                                        'investment': str(BANK)}, follow_redirects=True)
-        self.assertIn('investment accounts must be liquid', r.text)
-        self.assertIsNone(self.app.config['MMEX_STORE'].prefs()['nonliquid_accounts'])
+        # Both investment and not liquid: allowed.
+        self.client.post('/settings/reports', data={'csrf_token': csrf(page), 'nonliquid': str(BANK), 'investment': str(BANK)})
+        prefs = self.app.config['MMEX_STORE'].prefs()
+        self.assertEqual((prefs['nonliquid_accounts'], prefs['investment_accounts']), ([BANK], [BANK]))
         self.client.post('/settings/reports', data={'csrf_token': csrf(page), 'ignored': str(CASH_USD),
                                                     'nonliquid': str(CASH), 'investment': str(BANK)})
         prefs = self.app.config['MMEX_STORE'].prefs()

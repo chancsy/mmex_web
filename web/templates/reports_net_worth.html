@@ -27,5 +27,5 @@
   </tbody>
 </table></div>
 {% endif %}
-<p class="small muted">Total counts every account except ignored ones; Liquid leaves out the ones marked not liquid; Investment is the ones marked investment (part of Liquid); its Change leaves out money moved into or out of those accounts, so it's what rates and real transactions did. Each month at its month-end rates. "From rates" is how much of Total's change came only from exchange-rate moves on foreign-currency balances. Choose accounts in <a href="{{ url_for('settings.settings', _anchor='reports') }}">Settings</a>.</p>
+<p class="small muted">Total counts every account except ignored ones; Liquid leaves out the ones marked not liquid; Investment is the ones marked investment, liquid or not; its Change leaves out money moved into or out of those accounts, so it's what rates and real transactions did. Each month at its month-end rates. "From rates" is how much of Total's change came only from exchange-rate moves on foreign-currency balances. Choose accounts in <a href="{{ url_for('settings.settings', _anchor='reports') }}">Settings</a>.</p>
 {% endblock %}

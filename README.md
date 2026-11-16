@@ -153,7 +153,7 @@ automation (e.g. a bill fetcher) ──POST /api/queue──► queue ──you 
     Twin notes pattern, and extra currencies to keep rates for. For the
     reports, per account: **Ignore** (a separate "wallet", left out of
     every report), **Not liquid** (in Total, not Liquid; asset and loan
-    accounts until first saved) and **Investment** (part of Liquid). Kept
+    accounts until first saved) and **Investment** (liquid or not). Kept
     in `app.db`, so they're the same on every device.
   - **Light or dark:** a button in the top bar, remembered per device (a
     cookie); until it's used, the page follows the system setting.

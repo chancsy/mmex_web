@@ -49,7 +49,7 @@
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <section class="card">
     <h2>Reports</h2>
-    <p class="small muted tight"><strong>Ignore</strong>: a separate "wallet", left out of every report (totals, income and expenses). <strong>Not liquid</strong>: counted in Total but not Liquid (e.g. property, loans, retirement funds). <strong>Investment</strong>: counted in Investment, which is part of Liquid. An asset account's value includes the MMEX assets it holds (see Reports).{% if report.defaulted %} Not saved yet: asset and loan accounts are ticked Not liquid until you save.{% endif %}</p>
+    <p class="small muted tight"><strong>Ignore</strong>: a separate "wallet", left out of every report (totals, income and expenses). <strong>Not liquid</strong>: counted in Total but not Liquid (e.g. property, loans, retirement funds). <strong>Investment</strong>: counted in Investment, whether liquid or not. An asset account's value includes the MMEX assets it holds (see Reports).{% if report.defaulted %} Not saved yet: asset and loan accounts are ticked Not liquid until you save.{% endif %}</p>
     {% set cfg = report.cfg %}
     {% macro report_rows(g) %}
     <tbody>
