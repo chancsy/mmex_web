@@ -129,21 +129,26 @@ def _common(d, **kw):
 
 def _net_worth_chart(snap, monthly, lines) -> dict:
     """Total, Liquid, Investment (when any) and the Settings page's extra
-    lines, one point per month-end. An extra line adds its accounts'
-    balances to nothing, Liquid or Total, skipping any already in it.
-    Each series keeps its colour slot whichever others are drawn."""
+    lines, one point per month-end. An extra line is its accounts'
+    balances alone, added to Liquid or Total (skipping any already in it)
+    or taken out of Liquid or Total (only those in it, e.g. Total minus
+    EPF). Each series keeps its colour slot whichever others are drawn."""
     accts = snap['accounts']
     series = [{'name': 'Total', 'slot': 1, 'values': [r['total'] for r in monthly]},
               {'name': 'Liquid', 'slot': 2, 'values': [r['liquid'] for r in monthly]}]
     if any(abs(r['investment']) > 0.005 for r in monthly):
         series.append({'name': 'Investment', 'slot': 3, 'values': [r['investment'] for r in monthly]})
     for i, line in enumerate(lines):
-        add_to = line['add_to']
+        base, _, minus = line['add_to'].partition('_')
         def counted(a):
-            return not a['ignored'] and (add_to == 'total' or (add_to == 'liquid' and a['liquid']))
-        mine = [accts[a] for a in line['accounts'] if a in accts and not counted(accts[a])]
-        values = [sum(a['base'][r['month']] for a in mine) + (r[add_to] if add_to in ('liquid', 'total') else 0.0)
-                  for r in monthly]
+            return not a['ignored'] and (base == 'total' or (base == 'liquid' and a['liquid']))
+        chosen = [accts[a] for a in line['accounts'] if a in accts]
+        if minus:
+            values = [r[base] - sum(a['base'][r['month']] for a in chosen if counted(a)) for r in monthly]
+        else:
+            mine = [a for a in chosen if not counted(a)]
+            values = [sum(a['base'][r['month']] for a in mine) + (r[base] if base in ('liquid', 'total') else 0.0)
+                      for r in monthly]
         series.append({'name': line['name'], 'slot': 4 + i, 'values': values})
     return {'kind': 'line', 'secret': True, 'x': [r['month'] for r in monthly], 'series': series}
 

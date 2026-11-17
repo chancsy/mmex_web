@@ -274,6 +274,21 @@ class ReportPageTests(QueueTestsBase):
         self.assertEqual([by[k]['slot'] for k in ('Total', 'Liquid', 'Bank + Cash', 'Liquid + Cash')], [1, 2, 4, 5])
         # Asset/loan default aside, Bank and Cash are both liquid: "Liquid + Cash" adds nothing twice.
         self.assertEqual(by['Liquid + Cash']['values'], by['Liquid']['values'])
+        # Minus: Total minus Bank is Total less Bank's balance; Liquid minus an
+        # account that isn't in Liquid takes nothing out.
+        page = self.client.get('/settings').text
+        self.client.post('/settings', data={'csrf_token': csrf(page),
+                                            'line_0_name': 'Non-bank', 'line_0_add_to': 'total_minus',
+                                            'line_0_accounts': str(BANK),
+                                            'line_1_name': 'Bank', 'line_1_add_to': 'none', 'line_1_accounts': str(BANK),
+                                            'line_2_name': 'Liquid less nothing', 'line_2_add_to': 'liquid_minus',
+                                            'line_2_accounts': str(CAR_ACCT), 'nonliquid': str(CAR_ACCT),
+                                            'line_3_name': 'Odd', 'line_3_add_to': 'bogus'})
+        self.assertEqual(self.app.config['MMEX_STORE'].prefs()['chart_lines'][3]['add_to'], 'none')
+        by = {s['name']: s for s in chart('/reports/net-worth?end=2026-02&n=3')['series']}
+        self.assertEqual([round(t - b, 2) for t, b in zip(by['Total']['values'], by['Bank']['values'])],
+                         [round(v, 2) for v in by['Non-bank']['values']])
+        self.assertEqual(by['Liquid less nothing']['values'], by['Liquid']['values'])
         # The All range starts at the first month with data.
         allr = chart('/reports/net-worth?end=2026-02&n=all')
         with sqlite3.connect(self.db) as conn:

@@ -100,7 +100,10 @@ PREF_DEFAULTS = {
 }
 
 CHART_LINE_MAX = 5
-CHART_LINE_ADD_TO = {'none': 'Nothing', 'liquid': 'Liquid', 'total': 'Total'}
+# How a chart line combines its accounts: alone, added to Liquid or Total
+# (skipping any already in it), or taken out of Liquid or Total (only those in it).
+CHART_LINE_ADD_TO = {'none': 'Just these accounts', 'liquid': 'Liquid plus these', 'total': 'Total plus these',
+                     'liquid_minus': 'Liquid minus these', 'total_minus': 'Total minus these'}
 
 NONLIQUID_TYPES = ('Asset', 'Loan')
 
