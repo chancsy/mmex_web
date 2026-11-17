@@ -11,17 +11,18 @@
   </section>
   {% set cfg = report.cfg %}
   <details class="card fold" id="accounts"{% if report.defaulted %} open{% endif %}>
-    <summary><span class="arrow"></span><h2>Accounts</h2><span class="small muted">{{ hidden | length }} hidden · {{ cfg.ignored | length }} ignored · {{ cfg.nonliquid | length }} not liquid · {{ cfg.investment | length }} investment</span></summary>
-    <p class="small muted tight"><strong>Hidden</strong>: moves into a collapsed "Others" list at the bottom of its group on the accounts page; still counted in totals and shown everywhere else.<br><strong>Ignore</strong>: a separate "wallet", left out of every report (totals, income and expenses).<br><strong>Not liquid</strong>: counted in Total but not Liquid (e.g. property, loans, retirement funds).<br><strong>Investment</strong>: counted in Investment, whether liquid or not.<br>An asset account's value includes the MMEX assets it holds (see Reports).{% if report.defaulted %} Reports not set up yet: asset and loan accounts are ticked Not liquid until you save.{% endif %}</p>
+    <summary><span class="arrow"></span><h2>Accounts</h2><span class="small muted">{{ hidden | length }} hidden · {{ cfg.ignored | length }} ignored · {{ cfg.nonliquid | length }} not liquid · {{ cfg.investment | length }} investment · {{ report.income_out | length }} not in Income vs expenses</span></summary>
+    <p class="small muted tight"><strong>Hidden</strong>: moves into a collapsed "Others" list at the bottom of its group on the accounts page; still counted in totals and shown everywhere else.<br><strong>Ignore</strong>: a separate "wallet", left out of every report (totals, income and expenses).<br><strong>Not liquid</strong>: counted in Total but not Liquid (e.g. property, loans, retirement funds).<br><strong>Investment</strong>: counted in Investment, whether liquid or not.<br><strong>Not in Income vs expenses</strong>: its income and expenses are left out of that report (transfers in or out never count there), e.g. a retirement fund whose contributions and dividends aren't your saving; still in every balance.<br>An asset account's value includes the MMEX assets it holds (see Reports).{% if report.defaulted %} Reports not set up yet: asset and loan accounts are ticked Not liquid until you save.{% endif %}</p>
     {% macro account_rows(g) %}
     <tbody>
-      <tr class="gh"><th scope="rowgroup" colspan="5">{{ g.label }}</th></tr>
+      <tr class="gh"><th scope="rowgroup" colspan="6">{{ g.label }}</th></tr>
       {% for a in g.accounts %}
       <tr><th scope="row">{{ a.name }}</th>
         <td class="band">{% if g.closed %}<span class="muted" title="Closed accounts aren't on the accounts page">–</span>{% else %}<input type="checkbox" name="hidden" value="{{ a.id }}" aria-label="Hide {{ a.name }}"{% if a.id in hidden %} checked{% endif %}>{% endif %}</td>
         <td><input type="checkbox" name="ignored" value="{{ a.id }}" aria-label="Ignore {{ a.name }} in reports"{% if a.id in cfg.ignored %} checked{% endif %}></td>
         <td><input type="checkbox" name="nonliquid" value="{{ a.id }}" aria-label="{{ a.name }} not liquid"{% if a.id in cfg.nonliquid %} checked{% endif %}></td>
         <td><input type="checkbox" name="investment" value="{{ a.id }}" aria-label="{{ a.name }} investment"{% if a.id in cfg.investment %} checked{% endif %}></td>
+        <td><input type="checkbox" name="income_out" value="{{ a.id }}" aria-label="Leave {{ a.name }} out of Income vs expenses"{% if a.id in report.income_out %} checked{% endif %}></td>
       </tr>
       {% endfor %}
     </tbody>
@@ -29,8 +30,8 @@
     {% macro account_table(groups) %}
     <div class="tablewrap"><table class="report rsettings">
       <thead>
-        <tr class="bands"><th rowspan="2" scope="col">Account</th><th scope="colgroup" class="band">Accounts page</th><th scope="colgroup" colspan="3">Reports</th></tr>
-        <tr><th scope="col" class="band">Hidden</th><th scope="col">Ignore</th><th scope="col">Not liquid</th><th scope="col">Investment</th></tr>
+        <tr class="bands"><th rowspan="2" scope="col">Account</th><th scope="colgroup" class="band">Accounts page</th><th scope="colgroup" colspan="4">Reports</th></tr>
+        <tr><th scope="col" class="band">Hidden</th><th scope="col">Ignore</th><th scope="col">Not liquid</th><th scope="col">Investment</th><th scope="col">Not in Income vs expenses</th></tr>
       </thead>
       {% for g in groups %}{{ account_rows(g) }}{% endfor %}
     </table></div>
@@ -73,6 +74,17 @@
     {% endfor %}
     <button type="button" class="mini chartline-add" data-add-line hidden>Add line</button>
     </div>
+  </details>
+  <details class="card fold" id="income">
+    <summary><span class="arrow"></span><h2>Income vs expenses</h2><span class="small muted">{{ report.out_cats | length }} categor{{ 'y' if report.out_cats | length == 1 else 'ies' }} left out{% if report.out_cats %}: {{ report.out_cats | join(', ') }}{% endif %}</span></summary>
+    <p class="small muted tight">Categories left out of Income vs expenses, each with its subcategories: e.g. windfalls such as gifts or an inheritance, so the report shows what you save from regular income. By category still shows them. Whole accounts are left out with <strong>Not in Income vs expenses</strong> in Accounts above.</p>
+    <details class="keeppick"><summary>Choose categories</summary>
+      <div class="cattree">
+      {% for c in report.categories %}
+        <label class="check depth{{ [c.depth, 3] | min }}"><input type="checkbox" name="income_out_category" value="{{ c.id }}"{% if c.checked %} checked{% endif %}> {{ c.name }}{% if not c.active %} <span class="small muted">inactive</span>{% endif %}</label>
+      {% endfor %}
+      </div>
+    </details>
   </details>
   <section class="card" id="twin">
     <h2>Twin transactions</h2>

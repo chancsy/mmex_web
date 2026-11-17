@@ -8,6 +8,7 @@ import datetime
 from flask import Blueprint, abort, current_app, render_template, request
 
 from engine import reports as R
+from engine.core import CATEG_DELIM
 
 from .auth import login_required
 from .pages import TYPE_LABELS, TYPE_ORDER, db
@@ -261,6 +262,33 @@ def _lines(d, month_list):
     return R.flows(d.conn, d.ref, month_list[0] + '-01', R.month_end(month_list[-1]), ignored=cfg['ignored'])
 
 
+def _with_subcategories(ref, ids) -> set:
+    """The category ids and every category under them."""
+    ids, out = set(ids), set()
+    for c in ref.categories:
+        seen, cur = set(), c
+        while cur is not None and cur in ref.categories and cur not in seen:
+            if cur in ids:
+                out.add(c)
+                break
+            seen.add(cur)
+            cur = ref.categories[cur]['parent']
+    return out
+
+
+def _income_split(d, lines):
+    """(lines Income vs expenses counts, lines it leaves out, left-out
+    account ids, left-out category ids): the Settings page's choices, a
+    category with its subcategories."""
+    prefs = current_app.config['MMEX_STORE'].prefs()
+    accounts = set(prefs['income_excluded_accounts'])
+    cats = _with_subcategories(d.ref, prefs['income_excluded_categories'])
+    kept, out = [], []
+    for x in lines:
+        (out if x['account'] in accounts or x['category'] in cats else kept).append(x)
+    return kept, out, accounts, cats
+
+
 @bp.route('/income')
 @login_required
 def income():
@@ -268,7 +296,7 @@ def income():
     end, n, span = _span()
     ms = R.months(end, n)
     wide = R.months(end, n + 11)          # 11 months more, for the first months' 12-month average
-    lines = _lines(d, wide)
+    lines, left_out, out_accounts, out_cats = _income_split(d, _lines(d, wide))
     rows = R.income_expense(lines, ms)
     total = {k: sum(r[k] for r in rows) for k in ('income', 'expenses', 'net')}
     total['rate'] = total['net'] / total['income'] if total['income'] > 0.005 else None
@@ -279,8 +307,16 @@ def income():
                                                                      R.first_month(d.conn) or ms[0])},
              'extra': [{'name': 'Income', 'values': [r['income'] for r in rows]},
                        {'name': 'Expenses', 'values': [r['expenses'] for r in rows]}]}
+    # What the Settings page leaves out over the range shown: per account, then per top-level category.
+    gone = {}
+    for x in left_out:
+        if x['month'] in ms:
+            key = ((0, d.ref.account_name(x['account'])) if x['account'] in out_accounts
+                   else (1, x['path'].split(CATEG_DELIM)[0]))
+            gone[key] = gone.get(key, 0.0) + x['amount']
+    excluded = [{'name': k[1], 'account': k[0] == 0, 'amount': v} for k, v in sorted(gone.items())]
     return render_template('reports_income.html', rows=rows, total=total, average=average, span=span,
-                           **_common(d, chart=chart))
+                           excluded=excluded, excluding=bool(out_accounts or out_cats), **_common(d, chart=chart))
 
 
 @bp.route('/categories')

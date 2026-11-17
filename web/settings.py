@@ -37,7 +37,10 @@ def settings():
                         hide_balances=bool(request.form.get('hide_balances')), rate_keep_currencies=keep,
                         twin_notes=pattern, report_ignored_accounts=ids('ignored'),
                         nonliquid_accounts=ids('nonliquid'), investment_accounts=ids('investment'),
-                        chart_lines=_chart_lines(request.form, known), report_start_year=start_year)
+                        chart_lines=_chart_lines(request.form, known), report_start_year=start_year,
+                        income_excluded_accounts=ids('income_out'),
+                        income_excluded_categories=sorted({int(v) for v in request.form.getlist('income_out_category')
+                                                           if v.isdigit() and int(v) in d.ref.categories}))
         flash('Settings saved.', 'info')
         if added and can_write():
             n, dates = rates_page.fill_from_saved(d.conn, rates_page._base_symbol(d.conn),
@@ -106,7 +109,18 @@ def _report_settings(d, prefs) -> dict:
     lines = [dict(l, names=[accts[a]['name'] for a in l['accounts'] if a in accts]) for l in prefs['chart_lines']]
     blank = [{'name': '', 'add_to': 'none', 'accounts': [], 'names': []}] * (CHART_LINE_MAX - len(lines))
     first = report_engine.first_month(d.conn)
-    return {'groups': rows, 'cfg': cfg, 'defaulted': prefs['nonliquid_accounts'] is None,
+    out_cats = set(prefs['income_excluded_categories'])
+    kids = {}
+    for c in d.ref.categories.values():
+        kids.setdefault(c['parent'] if c['parent'] in d.ref.categories else None, []).append(c)
+    def tree(parent, depth):
+        for c in sorted(kids.get(parent, []), key=lambda c: c['name'].lower()):
+            yield {'id': c['id'], 'name': c['name'], 'depth': depth, 'checked': c['id'] in out_cats,
+                   'active': c['active'] not in (0, '0')}
+            yield from tree(c['id'], depth + 1)
+    return {'categories': list(tree(None, 0)), 'out_cats': [d.ref.category_path(c) for c in sorted(out_cats)
+                                                              if c in d.ref.categories],
+            'income_out': set(prefs['income_excluded_accounts']),'groups': rows, 'cfg': cfg, 'defaulted': prefs['nonliquid_accounts'] is None,
             'first_year': first[:4] if first else None, 'this_year': date.today().year,
             'lines': lines + blank, 'add_to': CHART_LINE_ADD_TO, 'line_max': CHART_LINE_MAX}
 

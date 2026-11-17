@@ -323,6 +323,31 @@ class ReportPageTests(QueueTestsBase):
         self.assertEqual(self.app.config['MMEX_STORE'].prefs()['report_start_year'], this_year - 9, 'bad input keeps it')
         save_year('')
         self.assertIsNone(self.app.config['MMEX_STORE'].prefs()['report_start_year'])
+        # Income vs expenses can leave out whole accounts and categories (with their
+        # subcategories); By category still shows everything.
+        def income_jan():
+            c = chart('/reports/income?end=2026-02&n=3')
+            return round(c['extra'][0]['values'][c['x'].index('2026-01')], 2)
+        self.assertAlmostEqual(income_jan(), round(3.21 * 1.1, 2))
+        page = self.client.get('/settings').text
+        self.assertIn('name="income_out_category"', page)
+        self.client.post('/settings', data={'csrf_token': csrf(page), 'income_out_category': ['1003', '99999']})
+        self.assertEqual(self.app.config['MMEX_STORE'].prefs()['income_excluded_categories'], [1003])
+        self.assertEqual(income_jan(), 0, 'Interest is under Income')
+        text = self.client.get('/reports/income?end=2026-02&n=3').text
+        self.assertIn('Left out, as chosen in', text)
+        self.assertIn(' Income (', text)
+        self.assertIn('Interest', self.client.get('/reports/categories?end=2026-02&n=3').text)
+        self.assertIn('1 category left out: Income', self.client.get('/settings').text)
+        page = self.client.get('/settings').text
+        self.client.post('/settings', data={'csrf_token': csrf(page), 'income_out': str(BANK)})
+        self.assertEqual(self.app.config['MMEX_STORE'].prefs()['income_excluded_accounts'], [BANK])
+        self.assertEqual(income_jan(), 0, 'the interest was paid into Bank')
+        self.assertIn('the Bank (EUR) account (', self.client.get('/reports/income?end=2026-02&n=3').text)
+        page = self.client.get('/settings').text
+        self.client.post('/settings', data={'csrf_token': csrf(page)})
+        self.assertAlmostEqual(income_jan(), round(3.21 * 1.1, 2))
+        self.assertNotIn('Left out, as chosen in', self.client.get('/reports/income?end=2026-02&n=3').text)
         inc = chart('/reports/income?end=2026-02&n=3')
         self.assertEqual((inc['kind'], len(inc['bars']['values']), len(inc['line']['values'])), ('bars', 3, 3))
         self.assertEqual(chart('/reports/accounts?by=year&n=3')['kind'], 'stack')

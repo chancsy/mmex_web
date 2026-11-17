@@ -383,8 +383,8 @@ def by_year(rows) -> list:
 
 def flows(conn, ref, date_from, date_to, ignored=()) -> list:
     """Income and expense amounts between two dates (inclusive), in the
-    base currency: [{month, category (id), path, kind ('income' or
-    'expense'), amount (signed: income +, expense -)}], one per row or split
+    base currency: [{month, account (id), category (id), path, kind
+    ('income' or 'expense'), amount (signed: income +, expense -)}], one per row or split
     line. Transfers, rows linked to an asset and ignored accounts are left
     out."""
     rates = Rates(conn)
@@ -408,7 +408,7 @@ def flows(conn, ref, date_from, date_to, ignored=()) -> list:
         sign = 1 if code == 'Deposit' else -1
         kind = 'income' if code == 'Deposit' else 'expense'
         for c, amt in splits.get(tid) or [(cat, amount or 0)]:
-            out.append({'month': day[:7], 'category': c, 'path': ref.category_path(c) or NO_CATEGORY,
+            out.append({'month': day[:7], 'account': acct, 'category': c, 'path': ref.category_path(c) or NO_CATEGORY,
                         'kind': kind, 'amount': sign * amt * rate})
     return out
 

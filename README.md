@@ -146,6 +146,9 @@ automation (e.g. a bill fetcher) ──POST /api/queue──► queue ──you 
     - **Income vs expenses:** each month's income (deposits), expenses
       (withdrawals), net and savings rate. Transfers and rows linked to an
       asset never count; split rows count under their split categories.
+      Settings can leave out whole accounts (e.g. a retirement fund) and
+      categories with their subcategories (e.g. windfalls); the page says
+      what was left out over the range.
       A chart shows each month's net as a bar, with its 12-month average.
     - **By category:** categories × months with total and average;
       top-level categories expand to their subcategories. A chart ranks
@@ -165,7 +168,8 @@ automation (e.g. a bill fetcher) ──POST /api/queue──► queue ──you 
     Twin notes pattern, and extra currencies to keep rates for. For the
     reports, per account: **Ignore** (a separate "wallet", left out of
     every report), **Not liquid** (in Total, not Liquid; asset and loan
-    accounts until first saved) and **Investment** (liquid or not), and
+    accounts until first saved), **Investment** (liquid or not) and **Not
+    in Income vs expenses**; categories left out of Income vs expenses; and
     the Net worth chart's extra lines and the year "All" starts from. Kept
     in `app.db`, so they're the same on every device.
   - **Light or dark:** a button in the top bar, remembered per device (a

@@ -22,5 +22,6 @@
       <td class="num">{{ delta(average.net, base, hide=False) }}</td><td></td></tr>
   </tfoot>
 </table></div>
+{% if excluding %}<p class="small muted">Left out, as chosen in <a href="{{ url_for('settings.settings', _anchor='income') }}">Settings</a>:{% for x in excluded %} {{ 'the ' ~ x.name ~ ' account' if x.account else x.name }} ({{ delta(x.amount, base, hide=False) }}){{ ',' if not loop.last else '.' }}{% else %} nothing in this range.{% endfor %}</p>{% endif %}
 <p class="small muted">Income is every deposit and expenses every withdrawal, in {{ base.symbol if base else 'the base currency' }} at the rate on its date; transfers never count, and ignored accounts are left out. Saved is net ÷ income. The chart's bars are each month's net (blue saved, red overspent); the line is the average net of the 12 months up to each month.</p>
 {% endblock %}

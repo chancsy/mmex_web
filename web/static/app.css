@@ -515,3 +515,8 @@ fieldset.chartline legend { font-size: .8rem; color: var(--muted); padding: 0 .3
 .chartline-row input, .chartline-row select { display: block; width: 100%; margin-top: .2rem; }
 .chartline-row .chartline-remove { align-self: flex-end; padding: .45rem 0; color: var(--neg); }
 button.chartline-add { margin-top: .6rem; }
+.cattree { columns: 16rem auto; column-gap: 1.5rem; }
+.cattree label.check { break-inside: avoid; }
+form.settings .cattree label.depth1 { padding-left: 1.4rem; }
+form.settings .cattree label.depth2 { padding-left: 2.8rem; }
+form.settings .cattree label.depth3 { padding-left: 4.2rem; }
