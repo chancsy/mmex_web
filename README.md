@@ -141,8 +141,8 @@ automation (e.g. a bill fetcher) ──POST /api/queue──► queue ──you 
       rates. Investment's change leaves out transfers into or out of
       investment accounts. A line chart draws them month by month, plus up
       to five extra lines chosen in Settings: accounts alone, or added to
-      or taken out of Liquid or Total (e.g. "Liquid + EPF", or "Non-EPF":
-      Total minus a retirement account).
+      or taken out of Liquid or Total (e.g. "Liquid + pension", or
+      "Without pension": Total minus a pension account).
     - **Income vs expenses:** each month's income (deposits), expenses
       (withdrawals), net and savings rate. Transfers and rows linked to an
       asset never count; split rows count under their split categories.

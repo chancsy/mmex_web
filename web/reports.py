@@ -132,8 +132,8 @@ def _net_worth_chart(snap, monthly, lines) -> dict:
     """Total, Liquid, Investment (when any) and the Settings page's extra
     lines, one point per month-end. An extra line is its accounts'
     balances alone, added to Liquid or Total (skipping any already in it)
-    or taken out of Liquid or Total (only those in it, e.g. Total minus
-    EPF). Each series keeps its colour slot whichever others are drawn."""
+    or taken out of Liquid or Total (only those in it, e.g. Total minus a
+    pension). Each series keeps its colour slot whichever others are drawn."""
     accts = snap['accounts']
     series = [{'name': 'Total', 'slot': 1, 'values': [r['total'] for r in monthly]},
               {'name': 'Liquid', 'slot': 2, 'values': [r['liquid'] for r in monthly]}]
