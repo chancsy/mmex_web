@@ -100,8 +100,11 @@ def _report_settings(d, prefs) -> dict:
     rows = [{'closed': closed, 'label': TYPE_LABELS.get(t, t),
              'accounts': sorted(accts_, key=lambda a: a['name'].lower())}
             for (closed, t), accts_ in sorted(groups.items(), key=lambda kv: key(kv[0]))]
+    # Every slot up to the maximum: the saved lines, then blank ones. With
+    # script off the page shows one blank, as a new line; with script,
+    # Add line shows the next blank one and Remove blanks one again.
     lines = [dict(l, names=[accts[a]['name'] for a in l['accounts'] if a in accts]) for l in prefs['chart_lines']]
-    blank = [] if len(lines) >= CHART_LINE_MAX else [{'name': '', 'add_to': 'none', 'accounts': [], 'names': []}]
+    blank = [{'name': '', 'add_to': 'none', 'accounts': [], 'names': []}] * (CHART_LINE_MAX - len(lines))
     first = report_engine.first_month(d.conn)
     return {'groups': rows, 'cfg': cfg, 'defaulted': prefs['nonliquid_accounts'] is None,
             'first_year': first[:4] if first else None, 'this_year': date.today().year,

@@ -51,24 +51,28 @@
   {% set saved_lines = report.lines | selectattr('name') | list %}
   <details class="card fold" id="chart-lines">
     <summary><span class="arrow"></span><h2>Net worth chart</h2><span class="small muted">{{ saved_lines | length }} extra line{{ '' if saved_lines | length == 1 else 's' }}{% if saved_lines %}: {{ saved_lines | map(attribute='name') | join(', ') }}{% endif %}</span></summary>
-    <p class="small muted tight">The chart always draws Total, Liquid and Investment. Add up to {{ report.line_max }} more lines, each the chosen accounts' balances, optionally added to Liquid or Total: e.g. "EPF" (just Retirement-EPF), or "Liquid + EPF" (EPF added to Liquid). Clear a line's name to remove it.</p>
+    <p class="small muted tight">The chart always draws Total, Liquid and Investment. Add up to {{ report.line_max }} more lines, each the chosen accounts' balances, optionally added to Liquid or Total: e.g. "EPF" (just Retirement-EPF), or "Liquid + EPF" (EPF added to Liquid). A line without a name isn't saved. Tap a name above the chart to hide its line for a while.</p>
+    <div class="chartlines" data-chartlines>
     {% for line in report.lines %}
-    <fieldset class="chartline">
+    {% set i = loop.index0 %}
+    <fieldset class="chartline" data-chartline{% if not line.name and i > saved_lines | length %} hidden data-spare{% endif %}>
       <legend>{{ 'New line' if not line.name else 'Line ' ~ loop.index }}</legend>
       <div class="chartline-row">
-        <label>Name <input name="line_{{ loop.index0 }}_name" value="{{ line.name }}" maxlength="40" placeholder="e.g. Liquid + EPF"></label>
-        <label>Add to <select name="line_{{ loop.index0 }}_add_to">{% for k, label in report.add_to.items() %}<option value="{{ k }}"{% if k == line.add_to %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+        <label>Name <input name="line_{{ i }}_name" value="{{ line.name }}" maxlength="40" placeholder="e.g. Liquid + EPF"></label>
+        <label>Add to <select name="line_{{ i }}_add_to">{% for k, label in report.add_to.items() %}<option value="{{ k }}"{% if k == line.add_to %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+        <button type="button" class="link chartline-remove" data-remove-line hidden>Remove</button>
       </div>
-      {% set i = loop.index0 %}
-      <details class="keeppick"><summary>{{ line.accounts | length }} account{{ '' if line.accounts | length == 1 else 's' }}{% if line.names %}: {{ line.names | join(', ') }}{% endif %} · choose</summary>
+      <details class="keeppick"><summary data-line-summary>{{ line.accounts | length }} account{{ '' if line.accounts | length == 1 else 's' }}{% if line.names %}: {{ line.names | join(', ') }}{% endif %} · choose</summary>
         <div class="chips">
         {% for g in report.groups %}{% for a in g.accounts %}
-          <label class="check"><input type="checkbox" name="line_{{ i }}_accounts" value="{{ a.id }}"{% if a.id in line.accounts %} checked{% endif %}> {{ a.name }}{% if g.closed %} <span class="small muted">closed</span>{% endif %}</label>
+          <label class="check"><input type="checkbox" name="line_{{ i }}_accounts" value="{{ a.id }}" data-name="{{ a.name }}"{% if a.id in line.accounts %} checked{% endif %}> {{ a.name }}{% if g.closed %} <span class="small muted">closed</span>{% endif %}</label>
         {% endfor %}{% endfor %}
         </div>
       </details>
     </fieldset>
     {% endfor %}
+    <button type="button" class="mini chartline-add" data-add-line hidden>Add line</button>
+    </div>
   </details>
   <section class="card" id="twin">
     <h2>Twin transactions</h2>

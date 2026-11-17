@@ -258,7 +258,12 @@ class ReportPageTests(QueueTestsBase):
         self.assertEqual(self.app.config['MMEX_STORE'].prefs()['chart_lines'],
                          [{'name': 'Bank + Cash', 'add_to': 'none', 'accounts': sorted([BANK, CASH])},
                           {'name': 'Liquid + Cash', 'add_to': 'liquid', 'accounts': sorted([BANK, CASH])}])
-        self.assertIn('2 extra lines: Bank + Cash, Liquid + Cash', self.client.get('/settings').text)
+        page = self.client.get('/settings').text
+        self.assertIn('2 extra lines: Bank + Cash, Liquid + Cash', page)
+        # Every slot is on the page (Add line shows them); without script, one blank shows.
+        from web.store import CHART_LINE_MAX
+        self.assertEqual(len(re.findall(r'data-chartline[ >]', page)), CHART_LINE_MAX)
+        self.assertEqual(page.count('hidden data-spare'), CHART_LINE_MAX - 3)
         def chart(url):
             text = self.client.get(url).text
             return json.loads(re.search(r'<script type="application/json" class="chart-data">(.*?)</script>', text, re.S).group(1))
