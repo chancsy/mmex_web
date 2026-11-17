@@ -7,7 +7,7 @@
   <button type="submit">Open</button>
   <span class="small muted">Download that day's rates from xe.com, or edit them.</span>
 </form>
-<p class="small muted">Every month-end since the first rate is listed; <strong>Download</strong> fetches a month-end that's missing rates for a currency kept in MMEX (one with an open account, or chosen in Settings) and saves xe.com's whole table; <strong>Fill</strong> uses a table already saved, without visiting xe.com. {{ base or 'Base currency' }} per one unit of each currency, as MMEX's currency history keeps them, at full precision: downloaded ones as xe.com gives them, typed ones as typed (shown here to 6 decimals; hover for the stored figure). Rows not on a month-end came from elsewhere, e.g. MMEX's own update.</p>
+<p class="small muted">Every month-end since the first rate is listed; <strong>Download</strong> fetches a month-end that's missing rates for a currency kept in MMEX (one with an open account, or chosen in <a href="{{ url_for('settings.settings', _anchor='rates') }}">Settings</a>) and saves xe.com's whole table; <strong>Fill</strong> uses a table already saved, without visiting xe.com. {{ base or 'Base currency' }} per one unit of each currency, as MMEX's currency history keeps them, at full precision: downloaded ones as xe.com gives them, typed ones as typed (shown here to 6 decimals; hover for the stored figure). Rows not on a month-end came from elsewhere, e.g. MMEX's own update.</p>
 {% if fillable and can_write() %}
 <form method="post" action="{{ url_for('rates.fill') }}" class="card filters">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

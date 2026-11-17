@@ -334,6 +334,12 @@ details.fold > summary::-webkit-details-marker { display: none; }
 details.fold > summary h2 { margin: 0; }
 details.fold > summary .small { font-weight: 400; }
 details.fold[open] > summary { margin-bottom: .5rem; }
+form.settings h2.sgroup { margin: 1.4rem 0 .5rem; }
+form.settings details.fold > summary h3 { font-size: 1rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0; }
+form.settings details.fold { margin-bottom: .6rem; }
+/* Save stays in view while a long section is open */
+.actions.savebar { position: sticky; bottom: 0; z-index: 2; background: var(--bg); margin: .6rem 0 0;
+  padding: .6rem 0 calc(.6rem + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line); }
 
 /* Queue review: what a batch does, as a timeline */
 .rv-summary { margin: 0 0 .5rem; padding: .45rem .7rem; background: var(--info-bg); border-radius: 8px; white-space: pre-wrap; }
