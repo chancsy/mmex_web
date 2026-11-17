@@ -7,7 +7,7 @@
 <p class="rby small">By <a href="{{ url_for('reports.net_worth', by='month') }}"{% if span.by == 'month' %} aria-current="page"{% endif %}>month</a> · <a href="{{ url_for('reports.net_worth', by='year') }}"{% if span.by == 'year' %} aria-current="page"{% endif %}>year</a></p>
 {% if span.by == 'year' %}
 <form method="get" class="card rspan"><input type="hidden" name="by" value="year">
-  <label>Last <select name="n">{% for s in span.spans %}<option value="{{ s }}"{% if s == span.n %} selected{% endif %}>{{ 'All' if s == 'all' else s ~ ' years' }}</option>{% endfor %}</select></label>
+  <label>Last <select name="n">{% for s in span.spans %}<option value="{{ s }}"{% if s == span.n %} selected{% endif %}>{{ span.all_label if s == 'all' else s ~ ' years' }}</option>{% endfor %}</select></label>
   <button type="submit" class="mini">Show</button></form>
 {% else %}
 {{ span_form(span, years, 'reports.net_worth', {'by': 'month'}) }}

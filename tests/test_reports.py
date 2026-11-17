@@ -282,6 +282,27 @@ class ReportPageTests(QueueTestsBase):
         self.assertEqual(sorted(re.findall(r'<th scope="row"><a [^>]*>(\d{4})</a>', nwy)), [str(y) for y in years])
         self.assertEqual(chart('/reports/accounts?by=year&n=all')['x'], [str(y) for y in years])
         self.assertEqual(self.client.get('/reports/accounts?n=all').status_code, 400, 'not By month')
+        # The Settings page's start year moves where All starts (never before the data).
+        def save_year(value):
+            page = self.client.get('/settings').text
+            return self.client.post('/settings', data={'csrf_token': csrf(page), 'report_start_year': value},
+                                    follow_redirects=True).text
+        from unittest import mock
+        this_year = int(web_reports._this_month()[:4])
+        later = this_year - 2
+        save_year(str(later))
+        self.assertEqual(self.app.config['MMEX_STORE'].prefs()['report_start_year'], later)
+        with mock.patch.object(web_reports.R, 'first_month', return_value=f'{this_year - 5}-03'):
+            self.assertEqual(chart('/reports/net-worth?n=all')['x'][0], f'{later}-01')
+            self.assertEqual(chart('/reports/accounts?by=year&n=all')['x'], [str(y) for y in range(later, this_year + 1)])
+            self.assertIn(f'>All from {later}</option>', self.client.get('/reports/net-worth?by=year').text)
+            save_year(str(this_year - 9))
+            self.assertEqual(chart('/reports/net-worth?n=all')['x'][0], f'{this_year - 5}-03', 'never before the data')
+            self.assertIn('>All</option>', self.client.get('/reports/net-worth?by=year').text)
+        self.assertIn('must be a year', save_year('20x5'))
+        self.assertEqual(self.app.config['MMEX_STORE'].prefs()['report_start_year'], this_year - 9, 'bad input keeps it')
+        save_year('')
+        self.assertIsNone(self.app.config['MMEX_STORE'].prefs()['report_start_year'])
         inc = chart('/reports/income?end=2026-02&n=3')
         self.assertEqual((inc['kind'], len(inc['bars']['values']), len(inc['line']['values'])), ('bars', 3, 3))
         self.assertEqual(chart('/reports/accounts?by=year&n=3')['kind'], 'stack')

@@ -95,6 +95,8 @@ PREF_DEFAULTS = {
     # Extra lines on the Net worth chart: [{name, add_to, accounts}], the
     # chosen accounts' balances added to nothing, Liquid or Total.
     'chart_lines': [],
+    # The year the reports' "All" range starts from; None = the first month with data.
+    'report_start_year': None,
 }
 
 CHART_LINE_MAX = 5

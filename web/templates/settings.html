@@ -43,6 +43,11 @@
     </details>
     {% endif %}
   </details>
+  <section class="card" id="report-range">
+    <h2>Reports: All range</h2>
+    <label>Start from year <input class="year-input" name="report_start_year" type="number" inputmode="numeric" min="1900" max="{{ report.this_year }}" value="{{ prefs.report_start_year or '' }}"{% if report.first_year %} placeholder="{{ report.first_year }}"{% endif %}></label>
+    <p class="small muted tight">The <strong>All</strong> range on Net worth and Account changes starts in January of this year (if your data starts later, it starts there). Leave empty to start from the first transaction{% if report.first_year %}, in {{ report.first_year }}{% endif %}.</p>
+  </section>
   {% set saved_lines = report.lines | selectattr('name') | list %}
   <details class="card fold" id="chart-lines">
     <summary><span class="arrow"></span><h2>Net worth chart</h2><span class="small muted">{{ saved_lines | length }} extra line{{ '' if saved_lines | length == 1 else 's' }}{% if saved_lines %}: {{ saved_lines | map(attribute='name') | join(', ') }}{% endif %}</span></summary>

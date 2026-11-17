@@ -153,7 +153,9 @@ automation (e.g. a bill fetcher) ──POST /api/queue──► queue ──you 
       year; types expand to their accounts. A chart stacks each type's
       gain above zero and loss below, with the net change as a dot.
     - Ranges: the last 3 to 36 months to a chosen month, or a calendar year
-      (Net worth also: all months).
+      (Net worth also: all months); by year, the last 3, 5 or 10 years, or
+      all. "All" starts at the first month with data, or at a start year
+      set in Settings.
     - Charts are drawn in the page (`web/static/charts.js`, no library);
       the table under each has every value, and the eye hides the amounts
       on balance charts as it does in the tables.
@@ -163,7 +165,7 @@ automation (e.g. a bill fetcher) ──POST /api/queue──► queue ──you 
     reports, per account: **Ignore** (a separate "wallet", left out of
     every report), **Not liquid** (in Total, not Liquid; asset and loan
     accounts until first saved) and **Investment** (liquid or not), and
-    the Net worth chart's extra lines. Kept
+    the Net worth chart's extra lines and the year "All" starts from. Kept
     in `app.db`, so they're the same on every device.
   - **Light or dark:** a button in the top bar, remembered per device (a
     cookie); until it's used, the page follows the system setting.

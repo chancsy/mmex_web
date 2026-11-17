@@ -11,7 +11,7 @@
 {% macro span_form(span, years, endpoint, extra={}) %}
 <form method="get" class="card rspan">
   {% for k, v in extra.items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
-  <label>Last <select name="n">{% for s in span.spans %}<option value="{{ s }}"{% if s == span.n and not span.year %} selected{% endif %}>{{ 'All' if s == 'all' else s ~ ' months' }}</option>{% endfor %}</select></label>
+  <label>Last <select name="n">{% for s in span.spans %}<option value="{{ s }}"{% if s == span.n and not span.year %} selected{% endif %}>{{ span.all_label if s == 'all' else s ~ ' months' }}</option>{% endfor %}</select></label>
   <label>to <input type="month" name="end" value="{{ span.end }}" max="{{ span.current }}"></label>
   <button type="submit" class="mini">Show</button>
   <span class="years small">Year: {% for y in years %}<a href="{{ url_for(endpoint, year=y, **extra) }}"{% if span.year == y | string %} aria-current="page"{% endif %}>{{ y }}</a>{% endfor %}</span>

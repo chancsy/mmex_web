@@ -4,6 +4,8 @@ the app is read-only. One exception, when the app can write: newly ticked
 extra currencies get their month-end rates filled from the saved xe.com
 tables (no xe.com visits)."""
 
+from datetime import date
+
 from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, url_for
 
 from engine import rates, reports as report_engine
@@ -29,12 +31,13 @@ def settings():
         keep = sorted({int(v) for v in request.form.getlist('keep_currency') if v.isdigit() and int(v) in known_curr})
         added = set(keep) - set(store.prefs()['rate_keep_currencies'])
         pattern = request.form.get('twin_notes', '').strip() or PREF_DEFAULTS['twin_notes']
+        start_year = _start_year(request.form.get('report_start_year', ''), store.prefs()['report_start_year'])
         # An account can be both investment and not liquid (Investment isn't part of Liquid).
         store.set_prefs(favourites_first=bool(request.form.get('favourites_first')), hidden_accounts=ids('hidden'),
                         hide_balances=bool(request.form.get('hide_balances')), rate_keep_currencies=keep,
                         twin_notes=pattern, report_ignored_accounts=ids('ignored'),
                         nonliquid_accounts=ids('nonliquid'), investment_accounts=ids('investment'),
-                        chart_lines=_chart_lines(request.form, known))
+                        chart_lines=_chart_lines(request.form, known), report_start_year=start_year)
         flash('Settings saved.', 'info')
         if added and can_write():
             n, dates = rates_page.fill_from_saved(d.conn, rates_page._base_symbol(d.conn),
@@ -53,6 +56,21 @@ def settings():
                            report=_report_settings(d, prefs),
                            default_pattern=PREF_DEFAULTS['twin_notes'],
                            currencies=curr, keep=set(prefs['rate_keep_currencies']), banners=d.banners)
+
+
+def _start_year(value, old):
+    """The reports' All start year from the form: empty = none (the first
+    month with data); a year from 1900 to this one; anything else keeps the
+    old value, with a message."""
+    value = value.strip()
+    if not value:
+        return None
+    this_year = date.today().year
+    if value.isdigit() and 1900 <= int(value) <= this_year:
+        return int(value)
+    flash(f'The reports start year must be a year from 1900 to {this_year}; kept '
+          f'{old or "the first year with data"}.', 'error')
+    return old
 
 
 def _chart_lines(form, known) -> list:
@@ -84,7 +102,9 @@ def _report_settings(d, prefs) -> dict:
             for (closed, t), accts_ in sorted(groups.items(), key=lambda kv: key(kv[0]))]
     lines = [dict(l, names=[accts[a]['name'] for a in l['accounts'] if a in accts]) for l in prefs['chart_lines']]
     blank = [] if len(lines) >= CHART_LINE_MAX else [{'name': '', 'add_to': 'none', 'accounts': [], 'names': []}]
+    first = report_engine.first_month(d.conn)
     return {'groups': rows, 'cfg': cfg, 'defaulted': prefs['nonliquid_accounts'] is None,
+            'first_year': first[:4] if first else None, 'this_year': date.today().year,
             'lines': lines + blank, 'add_to': CHART_LINE_ADD_TO, 'line_max': CHART_LINE_MAX}
 
 

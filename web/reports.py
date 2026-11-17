@@ -39,10 +39,11 @@ def _month_arg(name, default):
     return min(value, _this_month())
 
 
-def _span(first=None):
+def _span(first=None, all_label='All'):
     """(end month, number of months, range info for the template). ?year=Y
     picks that calendar year (to this month, for the current year). With
-    first (the first month with data), n=all is allowed: from that month."""
+    first (the All range's first month, see _all_from), n=all is allowed:
+    from that month."""
     current = _this_month()
     year = request.args.get('year', '').strip()
     shown_n = None
@@ -64,7 +65,8 @@ def _span(first=None):
             if n not in SPANS:
                 abort(400, f'n must be one of {", ".join(map(str, SPANS))}')
     spans = SPANS + (('all',) if first else ())
-    return end, n, {'end': end, 'n': shown_n or n, 'year': year, 'current': current, 'spans': spans}
+    return end, n, {'end': end, 'n': shown_n or n, 'year': year, 'current': current, 'spans': spans,
+                    'all_label': all_label}
 
 
 def _by():
@@ -74,10 +76,10 @@ def _by():
     return by
 
 
-def _year_span(first):
+def _year_span(first, all_label='All'):
     """(year labels, last full month, range info) for ?by=year&n=N: the
     last N calendar years, the current one to the last full month.
-    n=all starts from the year of first (the first month with data)."""
+    n=all starts from the year of first (see _all_from)."""
     current = _this_month()
     last = R.shift(current, -1)
     raw = request.args.get('n', '5')
@@ -92,7 +94,17 @@ def _year_span(first):
             abort(400, f'n must be one of {", ".join(map(str, YEAR_SPANS))}, or all')
     cols = [str(y) for y in range(int(last[:4]) - n + 1, int(last[:4]) + 1)]
     return cols, last, {'by': 'year', 'n': raw if raw == 'all' else n, 'spans': YEAR_SPANS + ('all',),
-                        'current': current, 'end': last}
+                        'current': current, 'end': last, 'all_label': all_label}
+
+
+def _all_from(d):
+    """(first month of the All range, its label): the first month with
+    data, or January of the Settings page's start year if that's later."""
+    first = R.first_month(d.conn)
+    year = current_app.config['MMEX_STORE'].prefs()['report_start_year']
+    if year and (not first or f'{year}-01' > first):
+        return f'{year}-01', f'All from {year}'
+    return first, 'All'
 
 
 def _years(d):
@@ -223,13 +235,13 @@ def month_end():
 def net_worth():
     d = db()
     if _by() == 'year':
-        cols, last, span = _year_span(R.first_month(d.conn))
+        cols, last, span = _year_span(*_all_from(d))
         # Every month from the December before the first year, so each
         # year's changes are its months' changes added up (and the chart
         # still draws every month-end).
         month_list = R.months(last, R.months_between(f'{int(cols[0]) - 1}-12', last) + 1)
     else:
-        end, n, span = _span(first=R.first_month(d.conn))
+        end, n, span = _span(*_all_from(d))
         span['by'] = 'month'
         month_list = R.months(end, n + 1)
     snap = R.snapshot(d.conn, month_list, config(d))
@@ -291,7 +303,7 @@ def account_changes():
     d = db()
     by = _by()
     if by == 'year':
-        cols, last, span = _year_span(R.first_month(d.conn))
+        cols, last, span = _year_span(*_all_from(d))
         # Each column is a year: from the previous December to this one (or
         # to the last full month, for the current year).
         points = [f'{int(cols[0]) - 1}-12'] + [min(f'{y}-12', last) for y in cols]
