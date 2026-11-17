@@ -74,19 +74,25 @@ def _by():
     return by
 
 
-def _year_span():
+def _year_span(first):
     """(year labels, last full month, range info) for ?by=year&n=N: the
-    last N calendar years, the current one to the last full month."""
-    try:
-        n = int(request.args.get('n', '5'))
-    except ValueError:
-        abort(400, 'n must be a number')
-    if n not in YEAR_SPANS:
-        abort(400, f'n must be one of {", ".join(map(str, YEAR_SPANS))}')
+    last N calendar years, the current one to the last full month.
+    n=all starts from the year of first (the first month with data)."""
     current = _this_month()
     last = R.shift(current, -1)
+    raw = request.args.get('n', '5')
+    if raw == 'all':
+        n = max(1, int(last[:4]) - int((first or last)[:4]) + 1)
+    else:
+        try:
+            n = int(raw)
+        except ValueError:
+            abort(400, 'n must be a number')
+        if n not in YEAR_SPANS:
+            abort(400, f'n must be one of {", ".join(map(str, YEAR_SPANS))}, or all')
     cols = [str(y) for y in range(int(last[:4]) - n + 1, int(last[:4]) + 1)]
-    return cols, last, {'by': 'year', 'n': n, 'spans': YEAR_SPANS, 'current': current, 'end': last}
+    return cols, last, {'by': 'year', 'n': raw if raw == 'all' else n, 'spans': YEAR_SPANS + ('all',),
+                        'current': current, 'end': last}
 
 
 def _years(d):
@@ -217,7 +223,7 @@ def month_end():
 def net_worth():
     d = db()
     if _by() == 'year':
-        cols, last, span = _year_span()
+        cols, last, span = _year_span(R.first_month(d.conn))
         # Every month from the December before the first year, so each
         # year's changes are its months' changes added up (and the chart
         # still draws every month-end).
@@ -285,7 +291,7 @@ def account_changes():
     d = db()
     by = _by()
     if by == 'year':
-        cols, last, span = _year_span()
+        cols, last, span = _year_span(R.first_month(d.conn))
         # Each column is a year: from the previous December to this one (or
         # to the last full month, for the current year).
         points = [f'{int(cols[0]) - 1}-12'] + [min(f'{y}-12', last) for y in cols]

@@ -274,7 +274,14 @@ class ReportPageTests(QueueTestsBase):
         with sqlite3.connect(self.db) as conn:
             first = R.first_month(conn)
         self.assertEqual(allr['x'][0], first)
-        self.assertEqual(self.client.get('/reports/income?n=all').status_code, 400, 'All is Net worth only')
+        self.assertEqual(self.client.get('/reports/income?n=all').status_code, 400, 'All is Net worth (and the year views) only')
+        # By year, All runs from the first data year to this one, on both year views.
+        years = list(range(int(first[:4]), int(web_reports._this_month()[:4]) + 1))
+        nwy = self.client.get('/reports/net-worth?by=year&n=all').text
+        self.assertIn('<option value="all" selected>All</option>', nwy)
+        self.assertEqual(sorted(re.findall(r'<th scope="row"><a [^>]*>(\d{4})</a>', nwy)), [str(y) for y in years])
+        self.assertEqual(chart('/reports/accounts?by=year&n=all')['x'], [str(y) for y in years])
+        self.assertEqual(self.client.get('/reports/accounts?n=all').status_code, 400, 'not By month')
         inc = chart('/reports/income?end=2026-02&n=3')
         self.assertEqual((inc['kind'], len(inc['bars']['values']), len(inc['line']['values'])), ('bars', 3, 3))
         self.assertEqual(chart('/reports/accounts?by=year&n=3')['kind'], 'stack')
