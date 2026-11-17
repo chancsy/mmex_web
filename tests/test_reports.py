@@ -244,6 +244,120 @@ class ReportPageTests(QueueTestsBase):
                     '/reports/accounts?by=week', '/reports/categories?year=26'):
             self.assertEqual(self.client.get(bad).status_code, 400, bad)
 
+    def test_charts(self):
+        import json, re
+        from web import reports as web_reports
+        page = self.client.get('/settings').text
+        # Chart lines: named ones kept (max 5), unnamed dropped, unknown accounts ignored.
+        self.client.post('/settings', data={'csrf_token': csrf(page),
+                                            'line_0_name': 'Bank + Cash', 'line_0_add_to': 'none',
+                                            'line_0_accounts': [str(BANK), str(CASH), '999'],
+                                            'line_1_name': 'Liquid + Cash', 'line_1_add_to': 'liquid',
+                                            'line_1_accounts': [str(CASH), str(BANK)],
+                                            'line_2_name': '', 'line_2_accounts': str(BANK)})
+        self.assertEqual(self.app.config['MMEX_STORE'].prefs()['chart_lines'],
+                         [{'name': 'Bank + Cash', 'add_to': 'none', 'accounts': sorted([BANK, CASH])},
+                          {'name': 'Liquid + Cash', 'add_to': 'liquid', 'accounts': sorted([BANK, CASH])}])
+        page = self.client.get('/settings').text
+        self.assertIn('2 extra lines: Bank + Cash, Liquid + Cash', page)
+        # Every slot is on the page (Add line shows them); without script, one blank shows.
+        from web.store import CHART_LINE_MAX
+        self.assertEqual(len(re.findall(r'data-chartline[ >]', page)), CHART_LINE_MAX)
+        self.assertEqual(page.count('hidden data-spare'), CHART_LINE_MAX - 3)
+        def chart(url):
+            text = self.client.get(url).text
+            return json.loads(re.search(r'<script type="application/json" class="chart-data">(.*?)</script>', text, re.S).group(1))
+        nw = chart('/reports/net-worth?end=2026-02&n=3')
+        self.assertEqual(nw['kind'], 'line')
+        self.assertEqual(nw['money']['decimals'], 2)
+        by = {s['name']: s for s in nw['series']}
+        self.assertEqual([by[k]['slot'] for k in ('Total', 'Liquid', 'Bank + Cash', 'Liquid + Cash')], [1, 2, 4, 5])
+        # Asset/loan default aside, Bank and Cash are both liquid: "Liquid + Cash" adds nothing twice.
+        self.assertEqual(by['Liquid + Cash']['values'], by['Liquid']['values'])
+        # Minus: Total minus Bank is Total less Bank's balance; Liquid minus an
+        # account that isn't in Liquid takes nothing out.
+        page = self.client.get('/settings').text
+        self.client.post('/settings', data={'csrf_token': csrf(page),
+                                            'line_0_name': 'Non-bank', 'line_0_add_to': 'total_minus',
+                                            'line_0_accounts': str(BANK),
+                                            'line_1_name': 'Bank', 'line_1_add_to': 'none', 'line_1_accounts': str(BANK),
+                                            'line_2_name': 'Liquid less nothing', 'line_2_add_to': 'liquid_minus',
+                                            'line_2_accounts': str(CAR_ACCT), 'nonliquid': str(CAR_ACCT),
+                                            'line_3_name': 'Odd', 'line_3_add_to': 'bogus'})
+        self.assertEqual(self.app.config['MMEX_STORE'].prefs()['chart_lines'][3]['add_to'], 'none')
+        by = {s['name']: s for s in chart('/reports/net-worth?end=2026-02&n=3')['series']}
+        self.assertEqual([round(t - b, 2) for t, b in zip(by['Total']['values'], by['Bank']['values'])],
+                         [round(v, 2) for v in by['Non-bank']['values']])
+        self.assertEqual(by['Liquid less nothing']['values'], by['Liquid']['values'])
+        # The All range starts at the first month with data.
+        allr = chart('/reports/net-worth?end=2026-02&n=all')
+        with sqlite3.connect(self.db) as conn:
+            first = R.first_month(conn)
+        self.assertEqual(allr['x'][0], first)
+        self.assertEqual(self.client.get('/reports/income?n=all').status_code, 400, 'All is Net worth (and the year views) only')
+        # By year, All runs from the first data year to this one, on both year views.
+        years = list(range(int(first[:4]), int(web_reports._this_month()[:4]) + 1))
+        nwy = self.client.get('/reports/net-worth?by=year&n=all').text
+        self.assertIn('<option value="all" selected>All</option>', nwy)
+        self.assertEqual(sorted(re.findall(r'<th scope="row"><a [^>]*>(\d{4})</a>', nwy)), [str(y) for y in years])
+        self.assertEqual(chart('/reports/accounts?by=year&n=all')['x'], [str(y) for y in years])
+        self.assertEqual(self.client.get('/reports/accounts?n=all').status_code, 400, 'not By month')
+        # The Settings page's start year moves where All starts (never before the data).
+        def save_year(value):
+            page = self.client.get('/settings').text
+            return self.client.post('/settings', data={'csrf_token': csrf(page), 'report_start_year': value},
+                                    follow_redirects=True).text
+        from unittest import mock
+        this_year = int(web_reports._this_month()[:4])
+        later = this_year - 2
+        save_year(str(later))
+        self.assertEqual(self.app.config['MMEX_STORE'].prefs()['report_start_year'], later)
+        with mock.patch.object(web_reports.R, 'first_month', return_value=f'{this_year - 5}-03'):
+            self.assertEqual(chart('/reports/net-worth?n=all')['x'][0], f'{later}-01')
+            self.assertEqual(chart('/reports/accounts?by=year&n=all')['x'], [str(y) for y in range(later, this_year + 1)])
+            self.assertIn(f'>All from {later}</option>', self.client.get('/reports/net-worth?by=year').text)
+            save_year(str(this_year - 9))
+            self.assertEqual(chart('/reports/net-worth?n=all')['x'][0], f'{this_year - 5}-03', 'never before the data')
+            self.assertIn('>All</option>', self.client.get('/reports/net-worth?by=year').text)
+        self.assertIn('must be a year', save_year('20x5'))
+        self.assertEqual(self.app.config['MMEX_STORE'].prefs()['report_start_year'], this_year - 9, 'bad input keeps it')
+        save_year('')
+        self.assertIsNone(self.app.config['MMEX_STORE'].prefs()['report_start_year'])
+        # Income vs expenses can leave out whole accounts and categories (with their
+        # subcategories); By category still shows everything.
+        def income_jan():
+            c = chart('/reports/income?end=2026-02&n=3')
+            return round(c['extra'][0]['values'][c['x'].index('2026-01')], 2)
+        self.assertAlmostEqual(income_jan(), round(3.21 * 1.1, 2))
+        page = self.client.get('/settings').text
+        self.assertIn('name="income_out_category"', page)
+        self.client.post('/settings', data={'csrf_token': csrf(page), 'income_out_category': ['1003', '99999']})
+        self.assertEqual(self.app.config['MMEX_STORE'].prefs()['income_excluded_categories'], [1003])
+        self.assertEqual(income_jan(), 0, 'Interest is under Income')
+        text = self.client.get('/reports/income?end=2026-02&n=3').text
+        self.assertIn('Left out, as chosen in', text)
+        self.assertIn(' Income (', text)
+        self.assertIn('Interest', self.client.get('/reports/categories?end=2026-02&n=3').text)
+        self.assertIn('1 category left out: Income', self.client.get('/settings').text)
+        page = self.client.get('/settings').text
+        self.client.post('/settings', data={'csrf_token': csrf(page), 'income_out': str(BANK)})
+        self.assertEqual(self.app.config['MMEX_STORE'].prefs()['income_excluded_accounts'], [BANK])
+        self.assertEqual(income_jan(), 0, 'the interest was paid into Bank')
+        self.assertIn('the Bank (EUR) account (', self.client.get('/reports/income?end=2026-02&n=3').text)
+        page = self.client.get('/settings').text
+        self.client.post('/settings', data={'csrf_token': csrf(page)})
+        self.assertAlmostEqual(income_jan(), round(3.21 * 1.1, 2))
+        self.assertNotIn('Left out, as chosen in', self.client.get('/reports/income?end=2026-02&n=3').text)
+        inc = chart('/reports/income?end=2026-02&n=3')
+        self.assertEqual((inc['kind'], len(inc['bars']['values']), len(inc['line']['values'])), ('bars', 3, 3))
+        self.assertEqual(chart('/reports/accounts?by=year&n=3')['kind'], 'stack')
+        self.assertIn('class="spark"', self.client.get('/reports/categories?end=2026-02&n=3').text)
+        # Helpers: the rolling average only counts months with data; sparklines skip flat rows.
+        rows = [{'month': '2026-01', 'net': 10.0}, {'month': '2026-02', 'net': 20.0}]
+        self.assertEqual(web_reports._rolling(rows, ['2026-01', '2026-02'], '2026-01'), [10.0, 15.0])
+        self.assertIsNone(web_reports._spark_points([0, 0, 0]))
+        self.assertEqual(web_reports._spark_points({'a': 1.0}, ['a', 'b'])['zero'], 15)
+
     def test_settings(self):
         page = self.client.get('/settings').text
         self.assertIn('id="accounts"', page)

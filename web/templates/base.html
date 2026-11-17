@@ -65,5 +65,6 @@
     {% block content %}{% endblock %}
   </main>
   {% if logged_in() %}<script src="{{ asset('app.js') }}" defer></script>{% endif %}
+  {% if chart is defined and chart %}<script src="{{ asset('charts.js') }}" defer></script>{% endif %}
 </body>
 </html>

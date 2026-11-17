@@ -4,6 +4,8 @@ the app is read-only. One exception, when the app can write: newly ticked
 extra currencies get their month-end rates filled from the saved xe.com
 tables (no xe.com visits)."""
 
+from datetime import date
+
 from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, url_for
 
 from engine import rates, reports as report_engine
@@ -11,7 +13,7 @@ from engine import rates, reports as report_engine
 from .auth import _safe_next, login_required
 from .pages import TYPE_LABELS, TYPE_ORDER, can_write, db
 from . import rates as rates_page
-from .store import PREF_DEFAULTS, report_config
+from .store import CHART_LINE_ADD_TO, CHART_LINE_MAX, PREF_DEFAULTS, report_config
 
 bp = Blueprint('settings', __name__)
 
@@ -29,11 +31,16 @@ def settings():
         keep = sorted({int(v) for v in request.form.getlist('keep_currency') if v.isdigit() and int(v) in known_curr})
         added = set(keep) - set(store.prefs()['rate_keep_currencies'])
         pattern = request.form.get('twin_notes', '').strip() or PREF_DEFAULTS['twin_notes']
+        start_year = _start_year(request.form.get('report_start_year', ''), store.prefs()['report_start_year'])
         # An account can be both investment and not liquid (Investment isn't part of Liquid).
         store.set_prefs(favourites_first=bool(request.form.get('favourites_first')), hidden_accounts=ids('hidden'),
                         hide_balances=bool(request.form.get('hide_balances')), rate_keep_currencies=keep,
                         twin_notes=pattern, report_ignored_accounts=ids('ignored'),
-                        nonliquid_accounts=ids('nonliquid'), investment_accounts=ids('investment'))
+                        nonliquid_accounts=ids('nonliquid'), investment_accounts=ids('investment'),
+                        chart_lines=_chart_lines(request.form, known), report_start_year=start_year,
+                        income_excluded_accounts=ids('income_out'),
+                        income_excluded_categories=sorted({int(v) for v in request.form.getlist('income_out_category')
+                                                           if v.isdigit() and int(v) in d.ref.categories}))
         flash('Settings saved.', 'info')
         if added and can_write():
             n, dates = rates_page.fill_from_saved(d.conn, rates_page._base_symbol(d.conn),
@@ -54,6 +61,35 @@ def settings():
                            currencies=curr, keep=set(prefs['rate_keep_currencies']), banners=d.banners)
 
 
+def _start_year(value, old):
+    """The reports' All start year from the form: empty = none (the first
+    month with data); a year from 1900 to this one; anything else keeps the
+    old value, with a message."""
+    value = value.strip()
+    if not value:
+        return None
+    this_year = date.today().year
+    if value.isdigit() and 1900 <= int(value) <= this_year:
+        return int(value)
+    flash(f'The reports start year must be a year from 1900 to {this_year}; kept '
+          f'{old or "the first year with data"}.', 'error')
+    return old
+
+
+def _chart_lines(form, known) -> list:
+    """The Net worth chart's extra lines from the form's line_N_* fields;
+    a line without a name is dropped (that's how one is removed)."""
+    out = []
+    for i in range(CHART_LINE_MAX + 1):
+        name = form.get(f'line_{i}_name', '').strip()[:40]
+        if not name or len(out) == CHART_LINE_MAX:
+            continue
+        add_to = form.get(f'line_{i}_add_to', 'none')
+        accounts = sorted({int(v) for v in form.getlist(f'line_{i}_accounts') if v.isdigit() and int(v) in known})
+        out.append({'name': name, 'add_to': add_to if add_to in CHART_LINE_ADD_TO else 'none', 'accounts': accounts})
+    return out
+
+
 def _report_settings(d, prefs) -> dict:
     """The Accounts section: every account by type (closed ones apart) and
     the current report choices (hidden ones are in prefs)."""
@@ -67,7 +103,26 @@ def _report_settings(d, prefs) -> dict:
     rows = [{'closed': closed, 'label': TYPE_LABELS.get(t, t),
              'accounts': sorted(accts_, key=lambda a: a['name'].lower())}
             for (closed, t), accts_ in sorted(groups.items(), key=lambda kv: key(kv[0]))]
-    return {'groups': rows, 'cfg': cfg, 'defaulted': prefs['nonliquid_accounts'] is None}
+    # Every slot up to the maximum: the saved lines, then blank ones. With
+    # script off the page shows one blank, as a new line; with script,
+    # Add line shows the next blank one and Remove blanks one again.
+    lines = [dict(l, names=[accts[a]['name'] for a in l['accounts'] if a in accts]) for l in prefs['chart_lines']]
+    blank = [{'name': '', 'add_to': 'none', 'accounts': [], 'names': []}] * (CHART_LINE_MAX - len(lines))
+    first = report_engine.first_month(d.conn)
+    out_cats = set(prefs['income_excluded_categories'])
+    kids = {}
+    for c in d.ref.categories.values():
+        kids.setdefault(c['parent'] if c['parent'] in d.ref.categories else None, []).append(c)
+    def tree(parent, depth):
+        for c in sorted(kids.get(parent, []), key=lambda c: c['name'].lower()):
+            yield {'id': c['id'], 'name': c['name'], 'depth': depth, 'checked': c['id'] in out_cats,
+                   'active': c['active'] not in (0, '0')}
+            yield from tree(c['id'], depth + 1)
+    return {'categories': list(tree(None, 0)), 'out_cats': [d.ref.category_path(c) for c in sorted(out_cats)
+                                                              if c in d.ref.categories],
+            'income_out': set(prefs['income_excluded_accounts']),'groups': rows, 'cfg': cfg, 'defaulted': prefs['nonliquid_accounts'] is None,
+            'first_year': first[:4] if first else None, 'this_year': date.today().year,
+            'lines': lines + blank, 'add_to': CHART_LINE_ADD_TO, 'line_max': CHART_LINE_MAX}
 
 
 @bp.route('/settings/balances', methods=['POST'])

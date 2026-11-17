@@ -92,7 +92,23 @@ PREF_DEFAULTS = {
     'report_ignored_accounts': [],     # a separate "wallet": left out of every report
     'nonliquid_accounts': None,        # in Total, not in Liquid
     'investment_accounts': [],         # in Investment (liquid or not)
+    # Extra lines on the Net worth chart: [{name, add_to, accounts}], the
+    # chosen accounts' balances added to nothing, Liquid or Total.
+    'chart_lines': [],
+    # Income vs expenses only (By category still shows everything): accounts
+    # whose income and expenses are left out (e.g. a retirement fund), and
+    # categories left out, each with its subcategories (e.g. windfalls).
+    'income_excluded_accounts': [],
+    'income_excluded_categories': [],
+    # The year the reports' "All" range starts from; None = the first month with data.
+    'report_start_year': None,
 }
+
+CHART_LINE_MAX = 5
+# How a chart line combines its accounts: alone, added to Liquid or Total
+# (skipping any already in it), or taken out of Liquid or Total (only those in it).
+CHART_LINE_ADD_TO = {'none': 'Just these accounts', 'liquid': 'Liquid plus these', 'total': 'Total plus these',
+                     'liquid_minus': 'Liquid minus these', 'total_minus': 'Total minus these'}
 
 NONLIQUID_TYPES = ('Asset', 'Loan')
 

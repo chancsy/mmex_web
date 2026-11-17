@@ -406,3 +406,72 @@
   openTarget();
   window.addEventListener('hashchange', openTarget);
 })();
+
+// Settings, Net worth chart: Add line shows the next blank line and Remove
+// blanks one again (a line without a name isn't saved), so lines can be
+// added and removed before one Save. Without this the page shows one blank.
+(function () {
+  'use strict';
+  var box = document.querySelector('[data-chartlines]');
+  if (!box) return;
+  var add = box.querySelector('[data-add-line]');
+  var lines = Array.prototype.slice.call(box.querySelectorAll('[data-chartline]'));
+  function nameBox(fs) { return fs.querySelector('input[name$="_name"]'); }
+  function summary(fs) {
+    var names = Array.prototype.map.call(fs.querySelectorAll('input[type=checkbox]:checked'),
+                                         function (c) { return c.dataset.name; });
+    fs.querySelector('[data-line-summary]').textContent = names.length + ' account' + (names.length === 1 ? '' : 's') +
+      (names.length ? ': ' + names.join(', ') : '') + ' · choose';
+  }
+  function spare(fs, on) {
+    fs.hidden = on;
+    if (on) fs.setAttribute('data-spare', ''); else fs.removeAttribute('data-spare');
+  }
+  function refresh() { add.hidden = !box.querySelector('[data-spare]'); }
+  lines.forEach(function (fs) {
+    if (!nameBox(fs).value.trim()) spare(fs, true);
+    var remove = fs.querySelector('[data-remove-line]');
+    remove.hidden = false;
+    remove.addEventListener('click', function () {
+      nameBox(fs).value = '';
+      fs.querySelector('select').value = 'none';
+      fs.querySelectorAll('input[type=checkbox]').forEach(function (c) { c.checked = false; });
+      fs.querySelector('details').open = false;
+      fs.querySelector('legend').textContent = 'New line';
+      summary(fs);
+      spare(fs, true);
+      refresh();
+      add.focus();
+    });
+    fs.addEventListener('change', function (e) { if (e.target.type === 'checkbox') summary(fs); });
+  });
+  add.addEventListener('click', function () {
+    var fs = box.querySelector('[data-spare]');
+    if (!fs) return;
+    spare(fs, false);
+    refresh();
+    nameBox(fs).focus();
+  });
+  refresh();
+})();
+
+// Settings: the sections open when Save was pressed are open again after
+// the page reloads (per tab, in sessionStorage; nothing if it's blocked).
+(function () {
+  'use strict';
+  var form = document.querySelector('form.settings');
+  if (!form) return;
+  var KEY = 'mmex_web_settings_open';
+  try {
+    var open = JSON.parse(sessionStorage.getItem(KEY) || '[]');
+    sessionStorage.removeItem(KEY);
+    open.forEach(function (id) {
+      var d = document.getElementById(id);
+      if (d && d.tagName === 'DETAILS') d.open = true;
+    });
+  } catch (e) { /* storage blocked: sections start as drawn */ }
+  form.addEventListener('submit', function () {
+    var ids = Array.prototype.map.call(form.querySelectorAll('details.fold[open][id]'), function (d) { return d.id; });
+    try { sessionStorage.setItem(KEY, JSON.stringify(ids)); } catch (e) { /* ignore */ }
+  });
+})();

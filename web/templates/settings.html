@@ -4,24 +4,20 @@
 <div class="heading"><h1>Settings</h1></div>
 <form method="post" class="settings">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <section class="card">
-    <h2>Accounts page</h2>
-    <label class="check"><input type="checkbox" name="favourites_first" value="1" {% if prefs.favourites_first %}checked{% endif %}> Put favourite accounts (★) first in each group</label>
-    <label class="check"><input type="checkbox" name="hide_balances" value="1" {% if prefs.hide_balances %}checked{% endif %}> Hide balances (the eye in the top bar does the same)</label>
-  </section>
   {% set cfg = report.cfg %}
   <details class="card fold" id="accounts"{% if report.defaulted %} open{% endif %}>
-    <summary><span class="arrow"></span><h2>Accounts</h2><span class="small muted">{{ hidden | length }} hidden · {{ cfg.ignored | length }} ignored · {{ cfg.nonliquid | length }} not liquid · {{ cfg.investment | length }} investment</span></summary>
-    <p class="small muted tight"><strong>Hidden</strong>: moves into a collapsed "Others" list at the bottom of its group on the accounts page; still counted in totals and shown everywhere else.<br><strong>Ignore</strong>: a separate "wallet", left out of every report (totals, income and expenses).<br><strong>Not liquid</strong>: counted in Total but not Liquid (e.g. property, loans, retirement funds).<br><strong>Investment</strong>: counted in Investment, whether liquid or not.<br>An asset account's value includes the MMEX assets it holds (see Reports).{% if report.defaulted %} Reports not set up yet: asset and loan accounts are ticked Not liquid until you save.{% endif %}</p>
+    <summary><span class="arrow"></span><h3>Accounts</h3><span class="small muted">{{ hidden | length }} hidden · {{ cfg.ignored | length }} ignored · {{ cfg.nonliquid | length }} not liquid · {{ cfg.investment | length }} investment · {{ report.income_out | length }} not in Income vs expenses</span></summary>
+    <p class="small muted tight"><strong>Hidden</strong>: moves into a collapsed "Others" list at the bottom of its group on the accounts page; still counted in totals and shown everywhere else.<br><strong>Ignore</strong>: a separate "wallet", left out of every report (totals, income and expenses).<br><strong>Not liquid</strong>: counted in Total but not Liquid (e.g. property, loans, retirement funds).<br><strong>Investment</strong>: counted in Investment, whether liquid or not.<br><strong>Not in Income vs expenses</strong>: its income and expenses are left out of that report (transfers in or out never count there), e.g. a retirement fund whose contributions and dividends aren't your saving; still in every balance.<br>An asset account's value includes the MMEX assets it holds (see Reports).{% if report.defaulted %} Reports not set up yet: asset and loan accounts are ticked Not liquid until you save.{% endif %}</p>
     {% macro account_rows(g) %}
     <tbody>
-      <tr class="gh"><th scope="rowgroup" colspan="5">{{ g.label }}</th></tr>
+      <tr class="gh"><th scope="rowgroup" colspan="6">{{ g.label }}</th></tr>
       {% for a in g.accounts %}
       <tr><th scope="row">{{ a.name }}</th>
         <td class="band">{% if g.closed %}<span class="muted" title="Closed accounts aren't on the accounts page">–</span>{% else %}<input type="checkbox" name="hidden" value="{{ a.id }}" aria-label="Hide {{ a.name }}"{% if a.id in hidden %} checked{% endif %}>{% endif %}</td>
         <td><input type="checkbox" name="ignored" value="{{ a.id }}" aria-label="Ignore {{ a.name }} in reports"{% if a.id in cfg.ignored %} checked{% endif %}></td>
         <td><input type="checkbox" name="nonliquid" value="{{ a.id }}" aria-label="{{ a.name }} not liquid"{% if a.id in cfg.nonliquid %} checked{% endif %}></td>
         <td><input type="checkbox" name="investment" value="{{ a.id }}" aria-label="{{ a.name }} investment"{% if a.id in cfg.investment %} checked{% endif %}></td>
+        <td><input type="checkbox" name="income_out" value="{{ a.id }}" aria-label="Leave {{ a.name }} out of Income vs expenses"{% if a.id in report.income_out %} checked{% endif %}></td>
       </tr>
       {% endfor %}
     </tbody>
@@ -29,8 +25,8 @@
     {% macro account_table(groups) %}
     <div class="tablewrap"><table class="report rsettings">
       <thead>
-        <tr class="bands"><th rowspan="2" scope="col">Account</th><th scope="colgroup" class="band">Accounts page</th><th scope="colgroup" colspan="3">Reports</th></tr>
-        <tr><th scope="col" class="band">Hidden</th><th scope="col">Ignore</th><th scope="col">Not liquid</th><th scope="col">Investment</th></tr>
+        <tr class="bands"><th rowspan="2" scope="col">Account</th><th scope="colgroup" class="band">Accounts page</th><th scope="colgroup" colspan="4">Reports</th></tr>
+        <tr><th scope="col" class="band">Hidden</th><th scope="col">Ignore</th><th scope="col">Not liquid</th><th scope="col">Investment</th><th scope="col">Not in Income vs expenses</th></tr>
       </thead>
       {% for g in groups %}{{ account_rows(g) }}{% endfor %}
     </table></div>
@@ -43,16 +39,22 @@
     </details>
     {% endif %}
   </details>
-  <section class="card" id="twin">
-    <h2>Twin transactions</h2>
+  <h2 class="sgroup">General</h2>
+  <details class="card fold" id="accounts-page">
+    <summary><span class="arrow"></span><h3>Accounts page</h3><span class="small muted">{{ 'Favourites first' if prefs.favourites_first else 'Favourites in place' }} · balances {{ 'hidden' if prefs.hide_balances else 'shown' }}</span></summary>
+    <label class="check"><input type="checkbox" name="favourites_first" value="1" {% if prefs.favourites_first %}checked{% endif %}> Put favourite accounts (★) first in each group</label>
+    <label class="check"><input type="checkbox" name="hide_balances" value="1" {% if prefs.hide_balances %}checked{% endif %}> Hide balances (the eye in the top bar does the same)</label>
+  </details>
+  <details class="card fold" id="twin">
+    <summary><span class="arrow"></span><h3>Twin transactions</h3><span class="small muted">{{ 'Default notes pattern' if prefs.twin_notes == default_pattern else 'Notes: ' ~ prefs.twin_notes }}</span></summary>
     <p class="small muted tight">The <strong>Twin</strong> type on the New page saves one purchase as two rows: a transfer from the paying account to the To account (e.g. Cash), with notes from this pattern, and a withdrawal with the real payee in the expense account (e.g. Household).</p>
     <label class="stack">Notes pattern for the transfer
       <input name="twin_notes" value="{{ prefs.twin_notes }}" placeholder="{{ default_pattern }}">
       <span class="small muted">{payee}, {expense_account} and {to_account} are filled in, e.g. "Grocer, Household -> Cash". Leave empty for the default, {{ default_pattern }}.</span>
     </label>
-  </section>
-  <section class="card">
-    <h2>Exchange rates: extra currencies</h2>
+  </details>
+  <details class="card fold" id="rates">
+    <summary><span class="arrow"></span><h3>Exchange rates</h3><span class="small muted">{{ keep | length }} extra currenc{{ 'y' if keep | length == 1 else 'ies' }} kept</span></summary>
     <p class="small muted tight">Currencies used by an open account always get month-end rates in MMEX. Tick others to give them rates too, e.g. one you'll travel in. Ticking fills their past month-ends from the xe.com tables already saved, with no visit to xe.com; later downloads include them. Unticking stops new ones and keeps what's stored.{% if currencies | selectattr('on_xe', 'false') | list %} Marked "not on xe.com": missing from xe.com's latest saved table (usually a retired currency), so nothing fills it.{% endif %}</p>
     <details class="keeppick"{% if keep %} open{% endif %}>
       <summary>{{ keep | length }} extra currenc{{ 'y' if keep | length == 1 else 'ies' }} kept · choose</summary>
@@ -63,7 +65,50 @@
       {% endfor %}
       </div>
     </details>
-  </section>
-  <div class="actions"><button type="submit">Save settings</button></div>
+  </details>
+  <h2 class="sgroup">Reports</h2>
+  <details class="card fold" id="report-range">
+    <summary><span class="arrow"></span><h3>Range</h3><span class="small muted">All starts from {{ prefs.report_start_year or ('the first transaction' ~ (', in ' ~ report.first_year if report.first_year else '')) }}</span></summary>
+    <label>Start from year <input class="year-input" name="report_start_year" type="number" inputmode="numeric" min="1900" max="{{ report.this_year }}" value="{{ prefs.report_start_year or '' }}"{% if report.first_year %} placeholder="{{ report.first_year }}"{% endif %}></label>
+    <p class="small muted tight">The <strong>All</strong> range on Net worth and Account changes starts in January of this year (if your data starts later, it starts there). Leave empty to start from the first transaction{% if report.first_year %}, in {{ report.first_year }}{% endif %}.</p>
+  </details>
+  {% set saved_lines = report.lines | selectattr('name') | list %}
+  <details class="card fold" id="chart-lines">
+    <summary><span class="arrow"></span><h3>Net worth chart</h3><span class="small muted">{{ saved_lines | length }} extra line{{ '' if saved_lines | length == 1 else 's' }}{% if saved_lines %}: {{ saved_lines | map(attribute='name') | join(', ') }}{% endif %}</span></summary>
+    <p class="small muted tight">The chart always draws Total, Liquid and Investment. Add up to {{ report.line_max }} more lines, each the chosen accounts' balances alone, or added to or taken out of Liquid or Total: e.g. "Pension" (just a pension account), "Liquid + pension" (Liquid plus it) or "Without pension" (Total minus it). A line without a name isn't saved. Tap a name above the chart to hide its line for a while.</p>
+    <div class="chartlines" data-chartlines>
+    {% for line in report.lines %}
+    {% set i = loop.index0 %}
+    <fieldset class="chartline" data-chartline{% if not line.name and i > saved_lines | length %} hidden data-spare{% endif %}>
+      <legend>{{ 'New line' if not line.name else 'Line ' ~ loop.index }}</legend>
+      <div class="chartline-row">
+        <label>Name <input name="line_{{ i }}_name" value="{{ line.name }}" maxlength="40" placeholder="e.g. Liquid + pension"></label>
+        <label>Line is <select name="line_{{ i }}_add_to">{% for k, label in report.add_to.items() %}<option value="{{ k }}"{% if k == line.add_to %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+        <button type="button" class="link chartline-remove" data-remove-line hidden>Remove</button>
+      </div>
+      <details class="keeppick"><summary data-line-summary>{{ line.accounts | length }} account{{ '' if line.accounts | length == 1 else 's' }}{% if line.names %}: {{ line.names | join(', ') }}{% endif %} · choose</summary>
+        <div class="chips">
+        {% for g in report.groups %}{% for a in g.accounts %}
+          <label class="check"><input type="checkbox" name="line_{{ i }}_accounts" value="{{ a.id }}" data-name="{{ a.name }}"{% if a.id in line.accounts %} checked{% endif %}> {{ a.name }}{% if g.closed %} <span class="small muted">closed</span>{% endif %}</label>
+        {% endfor %}{% endfor %}
+        </div>
+      </details>
+    </fieldset>
+    {% endfor %}
+    <button type="button" class="mini chartline-add" data-add-line hidden>Add line</button>
+    </div>
+  </details>
+  <details class="card fold" id="income">
+    <summary><span class="arrow"></span><h3>Income vs expenses</h3><span class="small muted">{{ report.out_cats | length }} categor{{ 'y' if report.out_cats | length == 1 else 'ies' }} left out{% if report.out_cats %}: {{ report.out_cats | join(', ') }}{% endif %}</span></summary>
+    <p class="small muted tight">Categories left out of Income vs expenses, each with its subcategories: e.g. windfalls such as gifts or an inheritance, so the report shows what you save from regular income. By category still shows them. To leave out everything recorded in one account (e.g. a retirement fund's contributions and dividends), tick it under <strong>Not in Income vs expenses</strong> in Accounts.</p>
+    <details class="keeppick"><summary>Choose categories</summary>
+      <div class="cattree">
+      {% for c in report.categories %}
+        <label class="check depth{{ [c.depth, 3] | min }}"><input type="checkbox" name="income_out_category" value="{{ c.id }}"{% if c.checked %} checked{% endif %}> {{ c.name }}{% if not c.active %} <span class="small muted">inactive</span>{% endif %}</label>
+      {% endfor %}
+      </div>
+    </details>
+  </details>
+  <div class="actions savebar"><button type="submit">Save settings</button></div>
 </form>
 {% endblock %}

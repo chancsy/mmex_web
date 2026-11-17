@@ -11,11 +11,27 @@
 {% macro span_form(span, years, endpoint, extra={}) %}
 <form method="get" class="card rspan">
   {% for k, v in extra.items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
-  <label>Last <select name="n">{% for s in span.spans %}<option value="{{ s }}"{% if s == span.n and not span.year %} selected{% endif %}>{{ s }} months</option>{% endfor %}</select></label>
+  <label>Last <select name="n">{% for s in span.spans %}<option value="{{ s }}"{% if s == span.n and not span.year %} selected{% endif %}>{{ span.all_label if s == 'all' else s ~ ' months' }}</option>{% endfor %}</select></label>
   <label>to <input type="month" name="end" value="{{ span.end }}" max="{{ span.current }}"></label>
   <button type="submit" class="mini">Show</button>
   <span class="years small">Year: {% for y in years %}<a href="{{ url_for(endpoint, year=y, **extra) }}"{% if span.year == y | string %} aria-current="page"{% endif %}>{{ y }}</a>{% endfor %}</span>
 </form>
 {% endmacro %}
+
+{# A chart drawn by charts.js from the JSON beside it; the table below it
+   holds every value, so nothing is only in the chart. #}
+{% macro chart_figure(chart, label) %}
+{% if chart %}
+<figure class="card chart" data-chart aria-label="{{ label }}" tabindex="0">
+  <script type="application/json" class="chart-data">{{ chart | tojson }}</script>
+  <noscript><p class="small muted">The chart needs JavaScript; the table below has every value.</p></noscript>
+</figure>
+{% endif %}
+{% endmacro %}
+
+{# A tiny trend line for a table row (no axes; the row's cells have the values). #}
+{% macro spark(pts) -%}
+{%- if pts %}<svg class="spark" viewBox="0 0 60 16" preserveAspectRatio="none" aria-hidden="true" focusable="false"><line class="zero" x1="0" x2="60" y1="{{ pts.zero }}" y2="{{ pts.zero }}"/><polyline points="{{ pts.points }}"/></svg>{% endif -%}
+{%- endmacro %}
 
 {% macro note(text) %}<p class="small muted">{{ text }}</p>{% endmacro %}

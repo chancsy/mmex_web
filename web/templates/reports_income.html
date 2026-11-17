@@ -1,11 +1,12 @@
 {% extends 'base.html' %}
-{% from '_reports.html' import tabs, delta, span_form %}
+{% from '_reports.html' import tabs, delta, span_form, chart_figure %}
 {% block title %}Income vs expenses · Reports · MMEX Web UI{% endblock %}
 {% macro pct(v) %}{{ '%.0f%%' | format(v * 100) if v is not none else '—' }}{% endmacro %}
 {% block content %}
 <div class="heading"><h1>Income vs expenses</h1></div>
 {{ tabs(pages, 'reports.income') }}
 {{ span_form(span, years, 'reports.income') }}
+{{ chart_figure(chart, 'Net saved each month, with its 12-month average') }}
 <div class="tablewrap"><table class="report">
   <thead><tr><th>Month</th><th>Income</th><th>Expenses</th><th>Net</th><th>Saved</th></tr></thead>
   <tbody>
@@ -21,5 +22,6 @@
       <td class="num">{{ delta(average.net, base, hide=False) }}</td><td></td></tr>
   </tfoot>
 </table></div>
-<p class="small muted">Income is every deposit and expenses every withdrawal, in {{ base.symbol if base else 'the base currency' }} at the rate on its date; transfers never count, and ignored accounts are left out. Saved is net ÷ income.</p>
+{% if excluding %}<p class="small muted">Left out, as chosen in <a href="{{ url_for('settings.settings', _anchor='income') }}">Settings</a>:{% for x in excluded %} {{ 'the ' ~ x.name ~ ' account' if x.account else x.name }} ({{ delta(x.amount, base, hide=False) }}){{ ',' if not loop.last else '.' }}{% else %} nothing in this range.{% endfor %}</p>{% endif %}
+<p class="small muted">Income is every deposit and expenses every withdrawal, in {{ base.symbol if base else 'the base currency' }} at the rate on its date; transfers never count, and ignored accounts are left out. Saved is net ÷ income. The chart's bars are each month's net (blue saved, red overspent); the line is the average net of the 12 months up to each month.</p>
 {% endblock %}

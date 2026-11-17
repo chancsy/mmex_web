@@ -52,5 +52,5 @@
 {% else %}
 <p>No accounts.</p>
 {% endfor %}
-<p class="small muted">Totals{% if in_base %} and balances{% endif %} are in {{ base.symbol if base else 'the base currency' }}, at the latest rates in MMEX's currency history{% if in_base %} (each converted balance shows its own-currency amount under it){% endif %}, and count open accounts only. Share and asset accounts show their cash balance only, without stock or asset values. Hide accounts or put favourites first in <a href="{{ url_for('settings.settings') }}">Settings</a>.</p>
+<p class="small muted">Totals{% if in_base %} and balances{% endif %} are in {{ base.symbol if base else 'the base currency' }}, at the latest rates in MMEX's currency history{% if in_base %} (each converted balance shows its own-currency amount under it){% endif %}, and count open accounts only. Share and asset accounts show their cash balance only, without stock or asset values. Hide accounts in <a href="{{ url_for('settings.settings', _anchor='accounts') }}">Settings</a>, or put favourites first <a href="{{ url_for('settings.settings', _anchor='accounts-page') }}">there too</a>.</p>
 {% endblock %}
