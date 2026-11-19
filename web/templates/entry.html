@@ -8,7 +8,7 @@
 {% set new_payee = v.payee and v.payee.lower() not in script_data.payees %}
 <div class="heading">
   <h1>{{ 'New transaction' if mode == 'add' else 'Edit transaction' }}</h1>
-  {% if mode == 'edit' %}<a class="small danger" href="{{ url_for('entry.delete', trans_id=trans.id, next=next or None) }}">Delete…</a>{% endif %}
+  {% if mode == 'edit' %}<span class="small"><a href="{{ url_for('entry.new', copy=trans.id, next=next or None) }}">Duplicate</a> · <a class="danger" href="{{ url_for('entry.delete', trans_id=trans.id, next=next or None) }}">Delete…</a></span>{% endif %}
 </div>
 
 {% if error %}<div class="banner error" role="alert">{{ error }}</div>{% endif %}

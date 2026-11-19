@@ -83,6 +83,11 @@ automation (e.g. a bill fetcher) ──POST /api/queue──► queue ──you 
     including the type (Withdrawal, Deposit or Transfer). Delete is MMEX's own soft delete (the row goes to MMEX's
     trash). A form opened before someone else changed the row is refused
     rather than overwriting their change.
+  - **Duplicate:** from a row's edit page, opens New with its fields
+    filled in, date included, except the number and status. Nothing is
+    saved until you press Save, and the original stays as it is. A copy
+    within 3 days of its original gets the usual "Possible duplicate"
+    warning; press Save anyway.
   - **History:** every write mmex_web made, newest first, each with an
     Undo. Undoing an undo is a redo. Either refuses if the row has changed
     since.

@@ -229,6 +229,8 @@ def new():
         trans_type = request.args.get('type', 'Withdrawal')
         account = request.args.get('account', type=int)
         values = form_values(MultiDict(), trans_type if trans_type in ADD_TYPES else 'Withdrawal')
+        if _copy_of(d, values):
+            return _render(d, 'add', values)
         values['date'] = request.args.get('date') or datetime.date.today().isoformat()
         values['account_id'] = str(account) if account in d.ref.accounts else ''
         if not values['account_id']:
@@ -347,6 +349,30 @@ def _new_twin(d, values):
     return redirect(url_for('pages.register', account_id=acct_id(paid_from)))
 
 
+def _values_of(t) -> dict:
+    """A saved row as form values (the edit form, or a copy's starting point)."""
+    return {'type': t['type'], 'account_id': str(t['account_id']),
+            'to_account_id': str(t['to_account_id'] or ''), 'payee': t.get('payee', ''), 'create_payee': False,
+            'category': t['category'], 'amount': f'{t["amount"]:.2f}',
+            'to_amount': f'{t["to_amount"]:.2f}' if t['type'] == 'Transfer' else '',
+            'date': t['date'], 'notes': t['notes'], 'number': t['number'], 'status': t['status'],
+            'tags': t['tags'], 'new_tags': ''}
+
+
+def _copy_of(d, values) -> bool:
+    """Fill a New form from the row in ?copy=<id>: everything but the
+    number and status, which a new row starts without. False when there's
+    no ?copy."""
+    trans_id = request.args.get('copy', type=int)
+    if not trans_id:
+        return False
+    t = views.transaction(d.conn, d.schema, d.ref, trans_id)
+    if t is None or t['deleted']:
+        abort(404, 'No such transaction to duplicate.')
+    values.update(_values_of(t), number='', status='')
+    return True
+
+
 def _load(d, trans_id):
     if d.schema is None:
         abort(403, 'This database can\'t be written by mmex_web.')
@@ -387,13 +413,7 @@ def edit(trans_id):
         return render_template('deleted.html', t=t, banners=d.banners)
     _require_writable(d)
     if request.method == 'GET':
-        values = {'type': t['type'], 'account_id': str(t['account_id']),
-                  'to_account_id': str(t['to_account_id'] or ''), 'payee': t.get('payee', ''), 'create_payee': False,
-                  'category': t['category'], 'amount': f'{t["amount"]:.2f}',
-                  'to_amount': f'{t["to_amount"]:.2f}' if t['type'] == 'Transfer' else '',
-                  'date': t['date'], 'notes': t['notes'], 'number': t['number'], 'status': t['status'],
-                  'tags': t['tags'], 'new_tags': ''}
-        return _render(d, 'edit', values, trans=dict(t, orig=json.dumps(_orig(t))))
+        return _render(d, 'edit', _values_of(t), trans=dict(t, orig=json.dumps(_orig(t))))
 
     orig = _read_orig(request.form)
     new_type = request.form.get('type') or t['type']
