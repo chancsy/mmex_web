@@ -214,6 +214,43 @@ class EntryTests(EntryTestsBase):
         self.assertEqual(self.newest()[5], 'V')
         self.assertEqual(fx.q(self.db, 'SELECT COUNT(*) FROM TAGLINK_V1 WHERE REFID = ?', trans_id)[0][0], 0)
 
+    def test_duplicate(self):
+        self.add(tags='trip', notes='lunch', number='77', status='F', next='/recent')
+        source = self.newest()[0]
+        page, _ = self.edit_page(source)
+        self.assertIn(f'href="/new?copy={source}"', page.text)
+        page = self.client.get(f'/new?copy={source}&next=/recent')
+        self.assertEqual(page.status_code, 200)
+        self.assertNotIn('name="copy"', page.text)
+        self.assertIn('value="/recent"', page.text)
+        self.assertIn('value="4.50"', page.text)
+        self.assertIn('value="2099-03-01"', page.text)     # the original date
+        self.assertIn('lunch', page.text)
+        self.assertNotIn('value="77"', page.text)          # no number
+        self.assertRegex(page.text, r'value="trip"[^>]*checked')
+        # Saving: warned about the original like any near duplicate (same
+        # date or a day off); then saved, and the original stays as it was.
+        before = self.rows('TRANSID = ?', source)
+        for date in ('2099-03-01', '2099-03-02'):
+            r = self.add(date=date, notes='lunch', tags='trip', next='/recent')
+            self.assertEqual(r.status_code, 200)
+            self.assertIn('Possible duplicate', r.text)
+            self.assertEqual(r.text.count('<li>2099-03-01'), 1)
+        self.assertEqual(len(self.rows("NOTES <> 'seed'")), 1)
+        r = self.add(notes='lunch', tags='trip', next='/recent', confirm_duplicate='1')
+        self.assertEqual(r.status_code, 302, re.findall(r"banner error[^<]*", r.text))
+        self.assertEqual(r.headers['Location'], '/recent')
+        copy = self.newest()
+        self.assertNotEqual(copy[0], source)
+        self.assertEqual(copy[1:6], ('Withdrawal', 4.5, 4.5, 'lunch', ''))
+        self.assertEqual(self.rows('TRANSID = ?', source), before)
+        # Transfers copy both accounts; missing or deleted rows are 404.
+        self.add(type='Transfer', to_account=str(CASH_EUR_ID), payee='', category='', amount='20')
+        page = self.client.get(f'/new?copy={self.newest()[0]}')
+        self.assertIn('value="20.00"', page.text)
+        self.assertRegex(page.text, rf'name="to_account"[\s\S]*?value="{CASH_EUR_ID}" selected')
+        self.assertEqual(self.client.get('/new?copy=999999').status_code, 404)
+
     def test_edit_to_a_new_payee(self):
         self.add()
         trans_id = self.newest()[0]
