@@ -34,6 +34,7 @@ def settings():
         start_year = _start_year(request.form.get('report_start_year', ''), store.prefs()['report_start_year'])
         # An account can be both investment and not liquid (Investment isn't part of Liquid).
         store.set_prefs(favourites_first=bool(request.form.get('favourites_first')), hidden_accounts=ids('hidden'),
+                        accounts_ignore_future=bool(request.form.get('accounts_ignore_future')),
                         hide_balances=bool(request.form.get('hide_balances')), rate_keep_currencies=keep,
                         twin_notes=pattern, report_ignored_accounts=ids('ignored'),
                         nonliquid_accounts=ids('nonliquid'), investment_accounts=ids('investment'),

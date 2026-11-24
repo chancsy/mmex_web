@@ -41,8 +41,9 @@
   </details>
   <h2 class="sgroup">General</h2>
   <details class="card fold" id="accounts-page">
-    <summary><span class="arrow"></span><h3>Accounts page</h3><span class="small muted">{{ 'Favourites first' if prefs.favourites_first else 'Favourites in place' }} · balances {{ 'hidden' if prefs.hide_balances else 'shown' }}</span></summary>
+    <summary><span class="arrow"></span><h3>Accounts page</h3><span class="small muted">{{ 'Favourites first' if prefs.favourites_first else 'Favourites in place' }} · balances {{ 'hidden' if prefs.hide_balances else 'shown' }}{% if prefs.accounts_ignore_future %} · future left out{% endif %}</span></summary>
     <label class="check"><input type="checkbox" name="favourites_first" value="1" {% if prefs.favourites_first %}checked{% endif %}> Put favourite accounts (★) first in each group</label>
+    <label class="check"><input type="checkbox" name="accounts_ignore_future" value="1" {% if prefs.accounts_ignore_future %}checked{% endif %}> Leave out future-dated transactions</label>
     <label class="check"><input type="checkbox" name="hide_balances" value="1" {% if prefs.hide_balances %}checked{% endif %}> Hide balances (the eye in the top bar does the same)</label>
   </details>
   <details class="card fold" id="twin">

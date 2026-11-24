@@ -78,6 +78,7 @@ CREATE INDEX IF NOT EXISTS queue_status ON queue(status, id);
 PREF_DEFAULTS = {
     'favourites_first': False,     # favourite accounts at the top of each group
     'hidden_accounts': [],         # account ids shown under "Others" on the accounts page
+    'accounts_ignore_future': True,    # accounts page: balances leave out rows dated after today
     'hide_balances': False,        # the eye in the top bar: balances shown as dots
     'rate_keep_currencies': [],    # MMEX currency ids given rates though no open account uses them
     # Twin entry (one purchase as two rows): a Transfer from the paying account

@@ -129,8 +129,10 @@ def accounts():
     # (MMEX's: the history rate nearest today, i.e. the latest month-end).
     in_base = request.args.get('base') == '1'
     d = db()
-    rows = views.accounts(d.conn, d.ref, include_closed=include_closed)
-    groups, grand = account_groups(rows, current_app.config['MMEX_STORE'].prefs())
+    prefs = current_app.config['MMEX_STORE'].prefs()
+    until = datetime.date.today().isoformat() if prefs['accounts_ignore_future'] else None
+    rows = views.accounts(d.conn, d.ref, include_closed=include_closed, until=until)
+    groups, grand = account_groups(rows, prefs)
     base = d.currencies.get(views.base_currency(d.conn))
     return render_template('accounts.html', groups=groups, grand=grand, base=base, include_closed=include_closed,
                            in_base=in_base and base is not None, currencies=d.currencies, banners=d.banners,
