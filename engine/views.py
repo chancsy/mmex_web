@@ -77,18 +77,23 @@ def base_rates(conn, today=None) -> dict:
     return rates
 
 
-def accounts(conn, ref, include_closed=False) -> list:
+def accounts(conn, ref, include_closed=False, until=None) -> list:
     """Every account (open only, unless include_closed) with its current
     balance and its reconciled balance (initial plus R rows only), each also
-    in the base currency (base_balance, base_reconciled; unrounded)."""
+    in the base currency (base_balance, base_reconciled; unrounded). With
+    until (YYYY-MM-DD), rows dated after it are left out, as MMEX's home
+    page does with "ignore future transactions"."""
+    upto = "AND substr(TRANSDATE, 1, 10) <= ?" if until else ''
+    args = (until,) if until else ()
     sums = {}
     for acct, total, rec in conn.execute(
             f"SELECT ACCOUNTID, SUM({SIGNED}), SUM(CASE WHEN STATUS = 'R' THEN {SIGNED} ELSE 0 END) "
-            f"FROM {TRANS} WHERE STATUS <> 'V' AND {NOT_DELETED} GROUP BY ACCOUNTID"):
+            f"FROM {TRANS} WHERE STATUS <> 'V' AND {NOT_DELETED} {upto} GROUP BY ACCOUNTID", args):
         sums[acct] = [total or 0, rec or 0]
     for acct, total, rec in conn.execute(
             "SELECT TOACCOUNTID, SUM(TOTRANSAMOUNT), SUM(CASE WHEN STATUS = 'R' THEN TOTRANSAMOUNT ELSE 0 END) "
-            f"FROM {TRANS} WHERE TRANSCODE = 'Transfer' AND STATUS <> 'V' AND {NOT_DELETED} GROUP BY TOACCOUNTID"):
+            f"FROM {TRANS} WHERE TRANSCODE = 'Transfer' AND STATUS <> 'V' AND {NOT_DELETED} {upto} GROUP BY TOACCOUNTID",
+            args):
         s = sums.setdefault(acct, [0, 0])
         s[0] += total or 0
         s[1] += rec or 0

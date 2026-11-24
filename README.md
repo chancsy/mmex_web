@@ -121,7 +121,9 @@ automation (e.g. a bill fetcher) ──POST /api/queue──► queue ──you 
     rate in MMEX's currency history (or the currency's fixed rate). Groups
     collapse (remembered per device), with Expand all / Collapse all.
     "Show all in <base>" shows every account's balance converted too, its
-    own-currency amount underneath.
+    own-currency amount underneath. The totals also show Assets (every
+    asset in MMEX's Assets list at today's value) and Balance (the grand
+    total plus Assets), as MMEX's home page does.
   - **Hide balances:** the eye in the top bar swaps every balance and
     total for dots at once (transaction amounts stay), and remembers it.
   - **Rates:** MMEX's currency history, one column per currency, with
@@ -168,7 +170,9 @@ automation (e.g. a bill fetcher) ──POST /api/queue──► queue ──you 
     - Charts are drawn in the page (`web/static/charts.js`, no library);
       the table under each has every value, and the eye hides the amounts
       on balance charts as it does in the tables.
-  - **Settings:** favourite accounts first, hide balances, accounts to
+  - **Settings:** favourite accounts first, hide balances, leave
+    future-dated transactions out of the Accounts page's balances and
+    totals (on by default, as MMEX's home page can), accounts to
     hide in a collapsed "Others" list at the bottom of their group, the
     Twin notes pattern, and extra currencies to keep rates for. For the
     reports, per account: **Ignore** (a separate "wallet", left out of

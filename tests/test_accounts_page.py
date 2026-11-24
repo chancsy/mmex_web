@@ -111,6 +111,64 @@ class AccountsPageTests(unittest.TestCase):
         self.assertEqual(self.app.test_client().get('/settings').status_code, 302)
 
 
+    def test_assets_and_balance(self):
+        def figures(page):
+            texts = re.sub(r'\s+', ' ', re.sub(r'<[^>]+>', ' ', page))
+            found = {k: re.search(k + r' €?(-?[0-9,]+\.[0-9]{2})', texts) for k in ('Total of accounts', 'Assets', 'Balance')}
+            self.assertTrue(all(found.values()), texts[:600])
+            return {k: float(m.group(1).replace(',', '')) for k, m in found.items()}
+
+        # No assets: Assets 0.00, Balance the same as Total of accounts.
+        f = figures(self.client.get('/').text)
+        self.assertEqual(f, {'Total of accounts': 1012.71, 'Assets': 0.0, 'Balance': 1012.71})
+        # Two assets, neither in an account (MMEX adds every asset): 1000 that
+        # doesn't change, and 365 USD losing 10% a year since 2026-01-01.
+        c = sqlite3.connect(self.db)
+        c.executemany("INSERT INTO ASSETS_V1 (ASSETID, STARTDATE, ASSETNAME, ASSETSTATUS, CURRENCYID, VALUECHANGEMODE, "
+                      "VALUE, VALUECHANGE, NOTES, VALUECHANGERATE, ASSETTYPE) VALUES "
+                      "(?, '2026-01-01', ?, 'Open', ?, 'Percentage', ?, ?, '', ?, 'Property')",
+                      [(1, 'Flat', -1, 1000, 'None', 0), (2, 'Van', USD, 365, 'Depreciates', 10)])
+        c.commit()
+        c.close()
+        from web.pages import assets_total
+        conn = self.conn()
+        self.assertAlmostEqual(assets_total(conn, today='2026-01-01'), 1000 + 365 * 0.28)   # USD's earliest rate
+        conn.close()
+        f = figures(self.client.get('/').text)
+        self.assertGreater(f['Assets'], 1000)
+        self.assertLess(f['Assets'], 1000 + 365 * 0.30)
+        self.assertEqual(f['Total of accounts'], 1012.71)
+        self.assertAlmostEqual(f['Balance'], f['Total of accounts'] + f['Assets'], delta=0.011)
+
+    def test_leave_out_future_transactions(self):
+        # A future deposit of 50 into Bank, reconciled: left out unless the setting is turned off.
+        c = sqlite3.connect(self.db)
+        c.execute("INSERT INTO CHECKINGACCOUNT_V1 (TRANSID, ACCOUNTID, TOACCOUNTID, PAYEEID, TRANSCODE, TRANSAMOUNT, "
+                  "STATUS, CATEGID, TRANSDATE, TOTRANSAMOUNT, DELETEDTIME) VALUES "
+                  "(6002, ?, -1, 2000, 'Deposit', 50, 'R', 1004, '2999-01-01', 50, '')", (BANK_ID,))
+        c.commit()
+        c.close()
+        conn = self.conn()
+        bank = lambda rows: next(a for a in rows if a['id'] == BANK_ID)
+        self.assertAlmostEqual(bank(views.accounts(conn, Ref(conn)))['balance'], 932.71)
+        rows = views.accounts(conn, Ref(conn), until='2998-12-31')
+        self.assertAlmostEqual(bank(rows)['balance'], 882.71)
+        self.assertAlmostEqual(bank(views.accounts(conn, Ref(conn)))['reconciled'] - bank(rows)['reconciled'], 50)
+        conn.close()
+        total = lambda: re.search(r'Total of accounts €?([0-9,]+\.[0-9]{2})',
+                                  re.sub(r'\s+', ' ', re.sub(r'<[^>]+>', ' ', self.client.get('/').text))).group(1)
+        # On by default.
+        self.assertEqual(total(), '1,012.71')
+        settings = self.client.get('/settings').text
+        self.assertRegex(settings, r'name="accounts_ignore_future" value="1"\s+checked')
+        self.assertIn('future left out', settings)
+        # Saved unticked: counted.
+        r = self.client.post('/settings', data={'csrf_token': csrf(settings)})
+        self.assertEqual(r.status_code, 302)
+        self.assertFalse(self.app.config['MMEX_STORE'].prefs()['accounts_ignore_future'])
+        self.assertEqual(total(), '1,062.71')
+        self.assertNotIn('future left out', self.client.get('/settings').text)
+
     def test_eye_hides_balances(self):
         page = self.client.get(f'/account/{BANK_ID}').text
         self.assertIn('<html lang="en">', page)

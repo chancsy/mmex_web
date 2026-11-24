@@ -28,6 +28,9 @@
 <section class="card totals">
   <div><span class="label">Total of accounts</span><span class="num big {{ 'neg' if grand.balance < -0.005 }}">{{ grand.balance | secret(base) }}</span></div>
   <div><span class="label">Reconciled</span><span class="num {{ 'neg' if grand.reconciled < -0.005 }}">{{ grand.reconciled | secret(base) }}</span></div>
+  <div><span class="label">Assets</span><span class="num {{ 'neg' if assets < -0.005 }}">{{ assets | secret(base) }}</span></div>
+  {% set balance = grand.balance + assets %}
+  <div><span class="label">Balance</span><span class="num {{ 'neg' if balance < -0.005 }}">{{ balance | secret(base) }}</span></div>
 </section>
 
 {% for g in groups %}
