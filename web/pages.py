@@ -7,7 +7,7 @@ import sqlite3
 
 from flask import Blueprint, abort, current_app, g, render_template, request
 
-from engine import core, dbfile, views
+from engine import core, dbfile, reports, views
 from engine.schema import SchemaError, check
 
 from .auth import login_required
@@ -133,7 +133,17 @@ def accounts():
     groups, grand = account_groups(rows, current_app.config['MMEX_STORE'].prefs())
     base = d.currencies.get(views.base_currency(d.conn))
     return render_template('accounts.html', groups=groups, grand=grand, base=base, include_closed=include_closed,
-                           in_base=in_base and base is not None, currencies=d.currencies, banners=d.banners)
+                           in_base=in_base and base is not None, currencies=d.currencies, banners=d.banners,
+                           assets=assets_total(d.conn))
+
+
+def assets_total(conn, today=None) -> float:
+    """Every asset in MMEX's Assets list at its value today, in the base
+    currency, as MMEX's home page adds them up (whether or not an account
+    holds them)."""
+    day = today or datetime.date.today().isoformat()
+    rates = reports.Rates(conn)
+    return sum(reports.asset_value(x, day, rates) for x in reports.assets(conn).values())
 
 
 @bp.route('/account/<int:account_id>')
